@@ -9,9 +9,9 @@ import os
 import sys
 from pathlib import Path
 
-# Add CodeVovle to path
-sys.path.insert(0, "/workspaces/WaterCodeFlow/CodeVovle")
-
+# Get the extension root directory (current directory since file is in root)
+EXTENSION_ROOT = Path(__file__).parent
+sys.path.insert(0, str(EXTENSION_ROOT / 'codevovle'))
 from codevovle.storage import BranchManager, ConfigManager, StateManager, SnapshotManager
 import storage_utility as su
 

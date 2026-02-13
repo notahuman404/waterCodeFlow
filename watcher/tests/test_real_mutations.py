@@ -17,14 +17,19 @@ import struct
 import pickle
 from pathlib import Path
 
-sys.path.insert(0, '/workspaces/WaterCodeFlow')
+import sys
+import os
+from pathlib import Path
 
+# Get the extension root directory (2 levels up from tests/)
+EXTENSION_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(EXTENSION_ROOT))
 print("="*70)
 print("TEST 1: REAL MUTATION DETECTION - Allocate & Register Page")
 print("="*70)
 
 # Load the C++ library
-lib_path = Path('/workspaces/WaterCodeFlow/build/libwatcher_python.so')
+lib_path = EXTENSION_ROOT / 'build' / 'libwatcher_python.so'
 lib = ctypes.CDLL(str(lib_path), use_errno=True)
 
 # Set up function signatures

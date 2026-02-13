@@ -30,8 +30,8 @@ export class GlueClient {
   async spawn(extensionPath: string): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        // extensionPath = /workspaces/WaterCodeFlow/editor
-        // We need to run from project root: /workspaces/WaterCodeFlow
+// extensionPath = /path/to/extension (wherever user places it)
+        // We navigate up one level to reach the project root where glue/ is located
         const projectRoot = path.dirname(extensionPath);
 
         this.subprocess = spawn("python3", ["-m", "glue.adapter"], {
