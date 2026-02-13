@@ -1,0 +1,3 @@
+The image should have the same placement as in the image, 
+Future note:
+This is decided because that specific setup gives eough space for each dropdown. 

@@ -1,0 +1,3 @@
+In the cofig, the track all variable overrides the seletced variables and tracks all variables in the scope of path given,
+Everything is done in the most logical way like combination of them if track local is off and the user still provides a local variable in the selection of dropdown to run variable 
+it doesnt get tracked

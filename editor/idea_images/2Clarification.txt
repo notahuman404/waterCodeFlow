@@ -1,0 +1,5 @@
+When the cursor is hovered over the run button and stays there for more than 0.5 sec, the drop down appears. 
+The code tracking only works during running, 
+Future Note:
+This is decided because the tracking only happens when the code is running, so it is added as a drop down to run button because people are familiar with it and feel like intentional 
+trustable and native

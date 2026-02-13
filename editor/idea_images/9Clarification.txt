@@ -1,0 +1,3 @@
+This page appears only when the user clicks on a variable name on the recordings dropdown the some import should take the data out from the stored memory and and uses it 
+so no duplicates get there the scrollbar is line based, it jumps to lines which chaged the variable and the meta data is displayed on the side the cross at the top right gets the user 
+back to the editor 

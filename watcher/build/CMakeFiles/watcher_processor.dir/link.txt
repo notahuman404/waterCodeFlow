@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -O3 -DNDEBUG -shared -Wl,-soname,libwatcher_processor.so -o libwatcher_processor.so CMakeFiles/watcher_processor.dir/processor/processor.cpp.o  -Wl,-rpath,/workspaces/WaterCodeFlow/watcher/build libwatcher_core.so -lpthread 

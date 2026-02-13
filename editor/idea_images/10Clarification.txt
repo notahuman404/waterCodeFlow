@@ -1,0 +1,8 @@
+In the image the runs are displayed this appears when the user clicks on a run in the recordings section, one clarification the all the recordings wheter it is of file or 
+variable or run should be deletable by right clicking and then slecting delete no other functionality of right click other than this 
+is variable gets its own box as i the image in the box each variable gets it scrollbar to deote it changes and the metadata on the side to tell about that mutation
+the mai scrollbar at the bottom is for ru wise its the main scrollbar, it shows whe flipped forward or backward, it changes the mutation of the variables 
+displyaed to the version which was at that point, if mutatios, the mutated version of the variable is shown 
+the top line of code and the line no changes. 
+if a lie executed but didbt chage any tracking variables, what it does is does include it in scrollbar
+Also the meta data tab is linked to the box which the variable gets each variable has its own meta data tab at right side of the screen

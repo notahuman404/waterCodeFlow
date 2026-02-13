@@ -1,0 +1,1 @@
+The image itself is very self explanatory but, one thing whe the user turns of the recording for some file and the later turns it back on after some time, the recording starts as brand new

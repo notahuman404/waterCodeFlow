@@ -1,0 +1,94 @@
+/* Variable Inspector styling */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  margin: 0;
+  padding: 0;
+}
+
+#inspector-container {
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background-color: var(--vscode-editor-lineHighlightBackground);
+  border-bottom: 1px solid var(--vscode-editor-background);
+}
+
+#header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+#btn-close {
+  background: none;
+  border: none;
+  color: var(--vscode-editor-foreground);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#btn-close:hover {
+  color: var(--vscode-terminal-ansiRed);
+}
+
+#timeline-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+#timeline-list {
+  margin-bottom: 16px;
+}
+
+.timeline-entry {
+  display: block;
+}
+
+.timeline-entry:hover {
+  background-color: var(--vscode-list-hoverBackground);
+  padding: 8px;
+  border-radius: 4px;
+}
+
+code {
+  font-family: "Courier New", monospace;
+  font-size: 11px !important;
+  background-color: var(--vscode-editor-background) !important;
+}
+
+#timeline-metadata {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--vscode-editor-lineHighlightBackground);
+}
+
+#timeline-metadata p {
+  margin: 0;
+  font-size: 11px;
+  background-color: var(--vscode-editor-lineHighlightBackground);
+  padding: 8px;
+  border-radius: 4px;
+}

@@ -1,0 +1,9 @@
+Each point in the slider denotes a recoding point, it should work with how many or how less recordings are there and update every 5 seconds, one more button for config
+which is not there in the image of config drop down but should be added is the scroll update interval, defualt to 5 seconds it determines in how much time does the scroll bar of 
+file recording and the scrol  bar of isights update according to chages made to code, if no changes, it doesnt update itself. 
+The branches should be a list ad after name of each branch there should be a button to rename it, main branch no matter the name of it would have (main) in front of it, 
+the sub branches would follow the path system which is defined the code of code vovle, insights button makes a pop up appear which also changes and updates if the changes in code are made 
+according to the new button that has to be added in config described above, and the tree style should work for any type of branch and work even multiple long branches with a method yet to 
+figure. 
+Future Note:
+Make it so the branches are easy to select even with long branches and seamless type 

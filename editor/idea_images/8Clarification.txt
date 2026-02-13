@@ -1,0 +1,6 @@
+Big cyan nodes are nodes of main, they always stay in center 
+there can be no branch whic is not coming out of node 
+for selected nodes to get insights the color of those nodes should turn yellow denoting selected 
+currently in the images only yellow color is used to denot both the before and after images but, in implementation make it so yellow is for the before and red is for the after 
+in insight for color of selected and used with cli to get insight
+this pop up only appear when the user clicks on the insights button

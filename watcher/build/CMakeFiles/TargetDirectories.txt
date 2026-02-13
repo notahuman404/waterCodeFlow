@@ -1,0 +1,7 @@
+/workspaces/WaterCodeFlow/watcher/build/CMakeFiles/watcher_core.dir
+/workspaces/WaterCodeFlow/watcher/build/CMakeFiles/watcher_python.dir
+/workspaces/WaterCodeFlow/watcher/build/CMakeFiles/watcher_processor.dir
+/workspaces/WaterCodeFlow/watcher/build/CMakeFiles/test_core.dir
+/workspaces/WaterCodeFlow/watcher/build/CMakeFiles/test.dir
+/workspaces/WaterCodeFlow/watcher/build/CMakeFiles/edit_cache.dir
+/workspaces/WaterCodeFlow/watcher/build/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,109 @@
+/* Insights panel styling */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  margin: 0;
+  padding: 0;
+}
+
+#insights-container {
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background-color: var(--vscode-editor-lineHighlightBackground);
+  border-bottom: 1px solid var(--vscode-editor-background);
+}
+
+#header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+#btn-close {
+  background: none;
+  border: none;
+  color: var(--vscode-editor-foreground);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+}
+
+#btn-close:hover {
+  color: var(--vscode-terminal-ansiRed);
+}
+
+#insights-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+#insights-summary {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--vscode-editor-lineHighlightBackground);
+}
+
+#insights-summary h3,
+#affected-lines h3 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vscode-editor-foreground);
+}
+
+#insights-summary p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--vscode-editor-foreground);
+}
+
+#affected-lines ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#affected-lines li {
+  padding: 8px;
+  margin-bottom: 4px;
+  background-color: var(--vscode-list-hoverBackground);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+}
+
+#affected-lines li:hover {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  transform: translateX(2px);
+}
+
+span {
+  display: inline-block;
+  font-size: 10px;
+  background-color: var(--vscode-editor-background);
+  padding: 4px 8px;
+  border-radius: 3px;
+  margin-right: 4px;
+  margin-bottom: 4px;
+  color: var(--vscode-descriptionForeground);
+}

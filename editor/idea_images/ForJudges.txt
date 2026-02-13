@@ -1,0 +1,8 @@
+If judges are inspecting this, this is a non polished file
+First question that you might ask is that how did i build these images or why 
+well i built these images because i dont how to go the frotend very well and instead of wasting time on building it from start and figurig out ui i built the images so i know exactly
+what to build, and for how well i used nano banana, chat gpt and figma to generate or edit these images, it was a part of rapid prototyping to build this project faster 
+For any teamate help, i edited all of this myself and created it myself, i was lazy to remove the gemini water mark but i did edit these images myself
+The pourpose of this file is to convey that i am building this project so fast because of ai offloading, i offloaded most of the work to ai 
+i did design the architecture myself after realizing that ai cant build something like this without proper arhcitetcure but i used ai wherever i could to make this project feasible under the window
+This is not a polished file and maybe you would never even read it but if you do then thanks for reading all of this, not many people actually read anything written by me

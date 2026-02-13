@@ -1,0 +1,4 @@
+in this image the tick shows if the variables will be tracked or not and if the variable is clicked then it shows a footer drop down which is type of a convinience because its oly 
+task is to give user the ability to track variables for multiple runs. 
+Future Note:
+This is decided so that devlopers feel conviniece in using this. 

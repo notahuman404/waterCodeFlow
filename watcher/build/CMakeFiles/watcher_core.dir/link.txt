@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -O3 -DNDEBUG -shared -Wl,-soname,libwatcher_core.so -o libwatcher_core.so CMakeFiles/watcher_core.dir/core/src/watcher_core.cpp.o  -lpthread 
