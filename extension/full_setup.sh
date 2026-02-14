@@ -447,9 +447,16 @@ print_success "TypeScript compiled to out/extension.js"
 
 print_header "STEP 7: PACKAGING EXTENSION"
 
-print_step "Installing vsce (VS Code Extension Manager)..."
-npm install -g @vscode/vsce >> "$LOG_FILE" 2>&1
-print_success "vsce installed"
+print_step "Checking if vsce is installed..."
+
+if command -v vsce >/dev/null 2>&1; then
+    print_success "vsce already installed"
+else
+    print_step "Installing vsce (VS Code Extension Manager)..."
+    npm install -g @vscode/vsce >> "$LOG_FILE" 2>&1
+    print_success "vsce installed"
+fi
+
 
 print_step "Packaging extension as .vsix file..."
 vsce package --allow-package-env-file --allow-star-activation --allow-missing-repository --no-dependencies >> "$LOG_FILE" 2>&1

@@ -1,8 +1,8 @@
-Setup started at Sat Feb 14 10:19:40 UTC 2026
-[2026-02-14 10:19:42] Detected OS: linux, Package Manager: apt
-[2026-02-14 10:19:42] Python3 found: 3.12.1
-[2026-02-14 10:19:42] Node.js found: v24.11.1
-[2026-02-14 10:19:42] Running: cmake /workspaces/waterCodeFlow/extension -DCMAKE_BUILD_TYPE=Release
+Setup started at Sat Feb 14 12:27:40 UTC 2026
+[2026-02-14 12:27:41] Detected OS: linux, Package Manager: apt
+[2026-02-14 12:27:41] Python3 found: 3.12.1
+[2026-02-14 12:27:42] Node.js found: v24.11.1
+[2026-02-14 12:27:42] Running: cmake /workspaces/waterCodeFlow/extension -DCMAKE_BUILD_TYPE=Release
 -- Python3 found: /home/codespace/.python/current/bin/python3
 -- Python3 include: /home/codespace/.python/current/include/python3.12
 -- Python3 libraries: /home/codespace/.python/current/lib/libpython3.12.a
@@ -39,13 +39,13 @@ Setup started at Sat Feb 14 10:19:40 UTC 2026
 -- Configuring done (0.1s)
 -- Generating done (0.0s)
 -- Build files have been written to: /workspaces/waterCodeFlow/extension/build
-[2026-02-14 10:19:43] Running: make -j2
+[2026-02-14 12:27:42] Running: make -j2
 [ 16%] Built target watcher_core
 [ 33%] Built target faststorage_c
-[ 50%] Built target test_core
-[ 66%] Built target watcher_faststorage_c
-[ 83%] Built target watcher_processor
-[100%] Built target watcher_python
+[ 50%] Built target watcher_faststorage_c
+[ 66%] Built target test_core
+[ 83%] Built target watcher_python
+[100%] Built target watcher_processor
 Requirement already satisfied: pip in /home/codespace/.python/current/lib/python3.12/site-packages (26.0.1)
 Requirement already satisfied: pytest in /home/codespace/.python/current/lib/python3.12/site-packages (9.0.2)
 Requirement already satisfied: psutil in /home/codespace/.local/lib/python3.12/site-packages (7.1.3)
@@ -54,7 +54,7 @@ Requirement already satisfied: packaging>=22 in /home/codespace/.local/lib/pytho
 Requirement already satisfied: pluggy<2,>=1.5 in /home/codespace/.python/current/lib/python3.12/site-packages (from pytest) (1.6.0)
 Requirement already satisfied: pygments>=2.7.2 in /home/codespace/.local/lib/python3.12/site-packages (from pytest) (2.19.2)
 
-up to date, audited 7 packages in 630ms
+up to date, audited 7 packages in 1s
 
 1 moderate severity vulnerability
 
@@ -74,11 +74,11 @@ Run `npm audit` for details.
   out/extension.js      24.9kb
   out/extension.js.map  41.7kb
 
-⚡ Done in 11ms
+⚡ Done in 6ms
 npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
 npm warn deprecated glob@11.1.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
-changed 299 packages in 7s
+changed 299 packages in 1m
 
 85 packages are looking for funding
   run `npm fund` for details
@@ -94,7 +94,7 @@ Executing prepublish script 'npm run vscode:prepublish'...
 
   out/extension.js  14.1kb
 
-⚡ Done in 6ms
+⚡ Done in 32ms
  WARNING  LICENSE, LICENSE.md, or LICENSE.txt not found
  WARNING  Neither a .vscodeignore file nor a "files" property in package.json was found. To ensure only necessary files are included in your extension, add a .vscodeignore file or specify the "files" property in package.json. More info: https://aka.ms/vscode-vscodeignore
 
@@ -123,7 +123,7 @@ watercodeflow-0.1.0.vsix
    ├─ build/ (98 files) [853.24 KB]
    ├─ editor/ (42 files) [24.74 MB]
    ├─ glue/ (14 files) [55.9 KB]
-   ├─ media/ (8 files) [19.9 KB]
+   ├─ media/ (9 files) [20.27 KB]
    ├─ out/ (2 files) [55.85 KB]
    ├─ src/ (7 files) [27.97 KB]
    ├─ storage_utility/ (3 files) [50.18 KB]
@@ -131,4 +131,4 @@ watercodeflow-0.1.0.vsix
 
 => Run vsce ls --tree to see all included files.
 
- DONE  Packaged: /workspaces/waterCodeFlow/extension/watercodeflow-0.1.0.vsix (386 files, 26.42 MB)
+ DONE  Packaged: /workspaces/waterCodeFlow/extension/watercodeflow-0.1.0.vsix (387 files, 26.42 MB)
