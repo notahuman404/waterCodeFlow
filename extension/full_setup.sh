@@ -1,11 +1,11 @@
 #!/bin/bash
 # ============================================================================
-# WATERCODEFLOW EXTENSION - COMPLETE AUTOMATED SETUP
+# WATERCODEFLOW EXTENSION - COMPLETE AUTOMATED SETUP (FIXED)
 # ============================================================================
 # This script does EVERYTHING to set up the extension:
 # 1. Checks and installs system dependencies
 # 2. Fixes all hardcoded paths automatically
-# 3. Builds C++ components
+# 3. Builds C++ components (FIXED: now uses root CMakeLists.txt)
 # 4. Installs Python dependencies
 # 5. Installs Node.js dependencies
 # 6. Compiles TypeScript
@@ -142,7 +142,7 @@ else
     if [[ "$PKG_MANAGER" == "apt" ]]; then
         print_info "Installing Python 3..."
         sudo apt-get update > /dev/null 2>&1
-        sudo apt-get install -y python3 python3-pip >> "$LOG_FILE" 2>&1
+        sudo apt-get install -y python3 python3-pip python3-dev >> "$LOG_FILE" 2>&1
         print_success "Python 3 installed"
     elif [[ "$PKG_MANAGER" == "brew" ]]; then
         print_info "Installing Python 3..."
@@ -256,21 +256,6 @@ print_header "STEP 2: FIXING HARDCODED PATHS"
 
 print_step "Fixing hardcoded paths in test files..."
 
-# Fix setup.sh
-if [ -f "setup.sh" ]; then
-    print_info "Fixing setup.sh..."
-    sed -i.bak 's|PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE\[0\]}")/\.\./\.\." && pwd)"|PROJECT_ROOT="$(cd "$(dirname \"${BASH_SOURCE[0]}\")\" \&\& pwd)"|g' setup.sh
-    print_success "Fixed setup.sh"
-fi
-
-# Fix tests/test_real_mutations.py
-if [ -f "tests/test_real_mutations.py" ]; then
-    print_info "Fixing tests/test_real_mutations.py..."
-    sed -i.bak "20s|sys.path.insert(0, '/workspaces/WaterCodeFlow')|# Get the extension root directory\nEXTENSION_ROOT = Path(__file__).parent.parent\nsys.path.insert(0, str(EXTENSION_ROOT))|" tests/test_real_mutations.py
-    sed -i.bak "27s|lib_path = Path('/workspaces/WaterCodeFlow/build/libwatcher_python.so')|lib_path = EXTENSION_ROOT / 'build' / 'libwatcher_python.so'|" tests/test_real_mutations.py
-    print_success "Fixed tests/test_real_mutations.py"
-fi
-
 # Create a Python script to fix all test files at once
 cat > /tmp/fix_paths.py << 'PYEOF'
 #!/usr/bin/env python3
@@ -282,7 +267,8 @@ files_to_fix = [
     "tests/test_mutations.py",
     "tests/test_javascript_loader.py",
     "tests/test_javascript_processor.py",
-    "tests/test_functionality.py"
+    "tests/test_functionality.py",
+    "tests/test_real_mutations.py"
 ]
 
 extension_root = Path.cwd()
@@ -298,7 +284,7 @@ for file_path in files_to_fix:
     # Replace the hardcoded paths
     content = re.sub(
         r"sys\.path\.insert\(0, '/workspaces/WaterCodeFlow'\)",
-        """# Get the extension root directory (2 levels up from tests/)
+        """# Get the extension root directory
 EXTENSION_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(EXTENSION_ROOT))""",
         content
@@ -310,29 +296,16 @@ sys.path.insert(0, str(EXTENSION_ROOT))""",
         content
     )
     
+    content = re.sub(
+        r"lib_path = Path\('/workspaces/WaterCodeFlow/build/libwatcher_python\.so'\)",
+        "lib_path = EXTENSION_ROOT / 'build' / 'libwatcher_python.so'",
+        content
+    )
+    
     with open(full_path, 'w') as f:
         f.write(content)
     
     print(f"Fixed: {file_path}")
-
-# Fix test_recursive_branching.py
-recursive_test = extension_root / "test_recursive_branching.py"
-if recursive_test.exists():
-    with open(recursive_test, 'r') as f:
-        content = f.read()
-    
-    content = re.sub(
-        r'sys\.path\.insert\(0, "/workspaces/WaterCodeFlow/CodeVovle"\)',
-        """# Get the extension root directory
-EXTENSION_ROOT = Path(__file__).parent
-sys.path.insert(0, str(EXTENSION_ROOT / 'codevovle'))""",
-        content
-    )
-    
-    with open(recursive_test, 'w') as f:
-        f.write(content)
-    
-    print(f"Fixed: test_recursive_branching.py")
 
 print("All hardcoded paths fixed!")
 PYEOF
@@ -342,25 +315,63 @@ print_success "All hardcoded paths fixed!"
 rm /tmp/fix_paths.py
 
 # ============================================================================
-# Step 3: Build C++ Components
+# Step 3: Build C++ Components (FIXED)
 # ============================================================================
 
 print_header "STEP 3: BUILDING C++ COMPONENTS"
 
+print_step "Checking for CMakeLists.txt in extension root..."
+if [ ! -f "$EXTENSION_ROOT/CMakeLists.txt" ]; then
+    print_error "CMakeLists.txt not found in extension root!"
+    print_error "Please place the CMakeLists.txt file in: $EXTENSION_ROOT"
+    print_info "The CMakeLists.txt should build all components:"
+    print_info "  - storage_utility/faststorage.c"
+    print_info "  - watcher/core/src/watcher_core.cpp"
+    print_info "  - watcher/adapters/python/adapter.cpp"
+    print_info "  - watcher/processor/processor.cpp"
+    exit 1
+else
+    print_success "Found CMakeLists.txt in extension root"
+fi
+
 print_step "Creating build directory..."
-mkdir -p build
-cd build
+mkdir -p "$EXTENSION_ROOT/build"
+cd "$EXTENSION_ROOT/build"
 
 print_step "Running CMake configuration..."
-cmake .. -DCMAKE_BUILD_TYPE=Release >> "$LOG_FILE" 2>&1
-print_success "CMake configured"
+log "Running: cmake $EXTENSION_ROOT -DCMAKE_BUILD_TYPE=Release"
+if cmake "$EXTENSION_ROOT" -DCMAKE_BUILD_TYPE=Release >> "$LOG_FILE" 2>&1; then
+    print_success "CMake configured successfully"
+else
+    print_error "CMake configuration failed!"
+    print_error "Check $LOG_FILE for details"
+    tail -n 20 "$LOG_FILE"
+    exit 1
+fi
 
-print_step "Compiling C++ libraries..."
-make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2) >> "$LOG_FILE" 2>&1
-print_success "C++ libraries compiled"
+print_step "Compiling C/C++ libraries..."
+NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
+log "Running: make -j$NPROC"
+if make -j$NPROC >> "$LOG_FILE" 2>&1; then
+    print_success "C/C++ libraries compiled successfully"
+else
+    print_error "Compilation failed!"
+    print_error "Check $LOG_FILE for details"
+    tail -n 30 "$LOG_FILE"
+    exit 1
+fi
+
+# Install libraries to correct locations
+print_step "Installing libraries..."
+if make install >> "$LOG_FILE" 2>&1; then
+    print_success "Libraries installed"
+else
+    print_warning "Library installation had issues (may be OK if already copied)"
+fi
 
 # List built libraries
-print_info "Built libraries:"
+print_info "Built libraries in $EXTENSION_ROOT/build:"
+cd "$EXTENSION_ROOT/build"
 for lib in *.so *.dylib 2>/dev/null; do
     if [ -f "$lib" ]; then
         SIZE=$(du -h "$lib" | cut -f1)
@@ -369,6 +380,37 @@ for lib in *.so *.dylib 2>/dev/null; do
 done
 
 cd "$EXTENSION_ROOT"
+
+# Verify critical libraries exist
+print_step "Verifying critical libraries..."
+MISSING_LIBS=0
+
+if [ -f "$EXTENSION_ROOT/storage_utility/faststorage_c.so" ]; then
+    print_success "faststorage_c.so found in storage_utility/"
+else
+    print_warning "faststorage_c.so not found in storage_utility/ (will look in build/)"
+    if [ -f "$EXTENSION_ROOT/build/faststorage_c.so" ]; then
+        print_info "Copying from build/ to storage_utility/"
+        cp "$EXTENSION_ROOT/build/faststorage_c.so" "$EXTENSION_ROOT/storage_utility/"
+        print_success "Copied faststorage_c.so"
+    else
+        print_error "faststorage_c.so not found anywhere!"
+        MISSING_LIBS=1
+    fi
+fi
+
+if [ -f "$EXTENSION_ROOT/build/libwatcher_python.so" ]; then
+    print_success "libwatcher_python.so found in build/"
+else
+    print_error "libwatcher_python.so not found in build/!"
+    MISSING_LIBS=1
+fi
+
+if [ $MISSING_LIBS -eq 1 ]; then
+    print_error "Some critical libraries are missing!"
+    print_error "Build may have failed. Check $LOG_FILE"
+    exit 1
+fi
 
 # ============================================================================
 # Step 4: Install Python Dependencies
@@ -457,9 +499,8 @@ echo "  4. Start recording and debug with time-travel!"
 echo ""
 
 echo -e "${BOLD}📄 Documentation:${RESET}"
-echo "  • HOW_TO_USE_EXTENSION.md - Complete usage guide"
-echo "  • HARDCODED_PATHS_TO_FIX.md - Technical details on path fixes"
-echo "  • QUICK_START.md - Quick reference"
+echo "  • README.md - Project overview"
+echo "  • QUICK_REFERENCE.md - Quick start guide"
 echo ""
 
 echo -e "${YELLOW}Setup log saved to: $LOG_FILE${RESET}"

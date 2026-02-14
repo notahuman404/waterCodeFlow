@@ -1,0 +1,12 @@
+Setup started at Sat Feb 14 06:05:41 UTC 2026
+[2026-02-14 06:05:52] Detected OS: linux, Package Manager: apt
+[2026-02-14 06:05:52] Python3 found: 3.12.1
+[2026-02-14 06:05:57] Node.js found: v24.11.1
+CMake Warning:
+  Ignoring extra path from command line:
+
+   ".."
+
+
+CMake Error: The source directory "/workspaces/waterCodeFlow/extension" does not appear to contain CMakeLists.txt.
+Specify --help for usage, or press the help button on the CMake GUI.
