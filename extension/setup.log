@@ -1,21 +1,8 @@
-Setup started at Sat Feb 14 06:24:33 UTC 2026
-[2026-02-14 06:24:35] Detected OS: linux, Package Manager: apt
-[2026-02-14 06:24:35] Python3 found: 3.12.1
-[2026-02-14 06:24:35] Node.js found: v24.11.1
-[2026-02-14 06:24:35] Running: cmake /workspaces/waterCodeFlow/extension -DCMAKE_BUILD_TYPE=Release
--- The CXX compiler identification is GNU 13.3.0
--- The C compiler identification is GNU 13.3.0
--- Detecting CXX compiler ABI info
--- Detecting CXX compiler ABI info - done
--- Check for working CXX compiler: /usr/bin/c++ - skipped
--- Detecting CXX compile features
--- Detecting CXX compile features - done
--- Detecting C compiler ABI info
--- Detecting C compiler ABI info - done
--- Check for working C compiler: /usr/bin/cc - skipped
--- Detecting C compile features
--- Detecting C compile features - done
--- Found Python3: /home/codespace/.python/current/bin/python3 (found version "3.12.1") found components: Interpreter Development Development.Module Development.Embed 
+Setup started at Sat Feb 14 10:19:40 UTC 2026
+[2026-02-14 10:19:42] Detected OS: linux, Package Manager: apt
+[2026-02-14 10:19:42] Python3 found: 3.12.1
+[2026-02-14 10:19:42] Node.js found: v24.11.1
+[2026-02-14 10:19:42] Running: cmake /workspaces/waterCodeFlow/extension -DCMAKE_BUILD_TYPE=Release
 -- Python3 found: /home/codespace/.python/current/bin/python3
 -- Python3 include: /home/codespace/.python/current/include/python3.12
 -- Python3 libraries: /home/codespace/.python/current/lib/libpython3.12.a
@@ -39,60 +26,109 @@ Setup started at Sat Feb 14 06:24:33 UTC 2026
 --   Version: 3.12.1
 --   Include: /home/codespace/.python/current/include/python3.12
 -- 
--- Install targets:
+-- Build output → /workspaces/waterCodeFlow/extension/build/
+-- 
+-- Auto-copy after build:
 --   - faststorage_c.so → storage_utility/
---   - libwatcher_python.so → build/
 --   - faststorage_c.so → watcher/storage_utility/
+--   - libwatcher_python.so stays in build/
+-- 
+-- Note: Run 'make' only - no need for 'make install'
 -- =================================================
 -- 
--- Configuring done (4.3s)
+-- Configuring done (0.1s)
 -- Generating done (0.0s)
 -- Build files have been written to: /workspaces/waterCodeFlow/extension/build
-[2026-02-14 06:24:40] Running: make -j2
-[  8%] Building CXX object CMakeFiles/watcher_core.dir/watcher/core/src/watcher_core.cpp.o
-[ 16%] Building C object CMakeFiles/faststorage_c.dir/storage_utility/faststorage.c.o
-[ 25%] Linking C shared library faststorage_c.so
-[ 25%] Built target faststorage_c
-[ 33%] Building C object CMakeFiles/watcher_faststorage_c.dir/watcher/storage_utility/faststorage.c.o
-[ 41%] Linking C shared library faststorage_c.so
-[ 50%] Linking CXX shared library libwatcher_core.so
-[ 50%] Built target watcher_faststorage_c
-[ 50%] Built target watcher_core
-[ 66%] Building CXX object CMakeFiles/watcher_python.dir/watcher/adapters/python/adapter.cpp.o
-[ 66%] Building CXX object CMakeFiles/watcher_processor.dir/watcher/processor/processor.cpp.o
-In file included from /workspaces/waterCodeFlow/extension/watcher/processor/processor.cpp:1:
-/workspaces/waterCodeFlow/extension/watcher/processor/include/processor.hpp: In member function ‘virtual watcher::processor::ProcessorResponse watcher::processor::NoOpProcessor::processEvent(const watcher::EnrichedEvent&)’:
-/workspaces/waterCodeFlow/extension/watcher/processor/include/processor.hpp:68:66: warning: unused parameter ‘event’ [-Wunused-parameter]
-   68 |     ProcessorResponse processEvent(const watcher::EnrichedEvent& event) override {
-      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~
-/workspaces/waterCodeFlow/extension/watcher/processor/processor.cpp: In static member function ‘static std::unique_ptr<watcher::processor::CustomProcessor> watcher::processor::ProcessorFactory::createPythonProcessor(const std::string&)’:
-/workspaces/waterCodeFlow/extension/watcher/processor/processor.cpp:24:93: warning: unused parameter ‘script_path’ [-Wunused-parameter]
-   24 | std::unique_ptr<CustomProcessor> ProcessorFactory::createPythonProcessor(const std::string& script_path) {
-      |                                                                          ~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
-/workspaces/waterCodeFlow/extension/watcher/processor/processor.cpp: In static member function ‘static std::unique_ptr<watcher::processor::CustomProcessor> watcher::processor::ProcessorFactory::createJavaScriptProcessor(const std::string&)’:
-/workspaces/waterCodeFlow/extension/watcher/processor/processor.cpp:29:97: warning: unused parameter ‘script_path’ [-Wunused-parameter]
-   29 | std::unique_ptr<CustomProcessor> ProcessorFactory::createJavaScriptProcessor(const std::string& script_path) {
-      |                                                                              ~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
-[ 75%] Linking CXX shared library libwatcher_processor.so
-[ 75%] Built target watcher_processor
-[ 83%] Building CXX object CMakeFiles/test_core.dir/watcher/tests/test_core.cpp.o
-[ 91%] Linking CXX shared library libwatcher_python.so
-[ 91%] Built target watcher_python
-[100%] Linking CXX executable test_core
-[100%] Built target test_core
-[ 16%] Built target faststorage_c
-[ 33%] Built target watcher_core
-[ 50%] Built target watcher_python
-[ 66%] Built target watcher_processor
-[ 83%] Built target watcher_faststorage_c
-[100%] Built target test_core
-Install the project...
--- Install configuration: "Release"
--- Installing: /workspaces/waterCodeFlow/extension/storage_utility/faststorage_c.so
-CMake Error at cmake_install.cmake:87 (file):
-  file INSTALL cannot find
-  "/workspaces/waterCodeFlow/extension/build/libwatcher_python.so": No such
-  file or directory.
+[2026-02-14 10:19:43] Running: make -j2
+[ 16%] Built target watcher_core
+[ 33%] Built target faststorage_c
+[ 50%] Built target test_core
+[ 66%] Built target watcher_faststorage_c
+[ 83%] Built target watcher_processor
+[100%] Built target watcher_python
+Requirement already satisfied: pip in /home/codespace/.python/current/lib/python3.12/site-packages (26.0.1)
+Requirement already satisfied: pytest in /home/codespace/.python/current/lib/python3.12/site-packages (9.0.2)
+Requirement already satisfied: psutil in /home/codespace/.local/lib/python3.12/site-packages (7.1.3)
+Requirement already satisfied: iniconfig>=1.0.1 in /home/codespace/.python/current/lib/python3.12/site-packages (from pytest) (2.3.0)
+Requirement already satisfied: packaging>=22 in /home/codespace/.local/lib/python3.12/site-packages (from pytest) (25.0)
+Requirement already satisfied: pluggy<2,>=1.5 in /home/codespace/.python/current/lib/python3.12/site-packages (from pytest) (1.6.0)
+Requirement already satisfied: pygments>=2.7.2 in /home/codespace/.local/lib/python3.12/site-packages (from pytest) (2.19.2)
+
+up to date, audited 7 packages in 630ms
+
+1 moderate severity vulnerability
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+> watercodeflow@0.1.0 esbuild
+> npm run esbuild-base -- --sourcemap
 
 
-make: *** [Makefile:110: install] Error 1
+> watercodeflow@0.1.0 esbuild-base
+> esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --platform=node --target=node20 --format=cjs --sourcemap
+
+
+  out/extension.js      24.9kb
+  out/extension.js.map  41.7kb
+
+⚡ Done in 11ms
+npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+npm warn deprecated glob@11.1.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+changed 299 packages in 7s
+
+85 packages are looking for funding
+  run `npm fund` for details
+Executing prepublish script 'npm run vscode:prepublish'...
+
+> watercodeflow@0.1.0 vscode:prepublish
+> npm run esbuild-base -- --minify
+
+
+> watercodeflow@0.1.0 esbuild-base
+> esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --platform=node --target=node20 --format=cjs --minify
+
+
+  out/extension.js  14.1kb
+
+⚡ Done in 6ms
+ WARNING  LICENSE, LICENSE.md, or LICENSE.txt not found
+ WARNING  Neither a .vscodeignore file nor a "files" property in package.json was found. To ensure only necessary files are included in your extension, add a .vscodeignore file or specify the "files" property in package.json. More info: https://aka.ms/vscode-vscodeignore
+
+ INFO  Files included in the VSIX:
+watercodeflow-0.1.0.vsix
+├─ [Content_Types].xml 
+├─ extension.vsixmanifest 
+└─ extension/
+   ├─ Architecture.yaml [12.75 KB]
+   ├─ CMakeLists.txt [7.24 KB]
+   ├─ DecisionOfBuilding.md [6.39 KB]
+   ├─ EXTENSION_DISTRIBUTION_GUIDE.md [11.62 KB]
+   ├─ IMPLEMENTATION_SUMMARY.md [14.09 KB]
+   ├─ INTEGRATION_VERIFICATION_REPORT.md [11.41 KB]
+   ├─ QUICK_REFERENCE.md [6.03 KB]
+   ├─ USAGE_SURFACE.md [40.34 KB]
+   ├─ full_setup.sh [16.21 KB]
+   ├─ package.json [2.69 KB]
+   ├─ readme.md 
+   ├─ setup.log [4.32 KB]
+   ├─ test.py [0.37 KB]
+   ├─ tsconfig.json [0.43 KB]
+   ├─ .codevovle/ (2 files) [0.05 KB]
+   ├─ .vscode/ (1 file) [0.31 KB]
+   ├─ CodeVovle/ (63 files) [799.37 KB]
+   ├─ build/ (98 files) [853.24 KB]
+   ├─ editor/ (42 files) [24.74 MB]
+   ├─ glue/ (14 files) [55.9 KB]
+   ├─ media/ (8 files) [19.9 KB]
+   ├─ out/ (2 files) [55.85 KB]
+   ├─ src/ (7 files) [27.97 KB]
+   ├─ storage_utility/ (3 files) [50.18 KB]
+   └─ watcher/ (130 files) [4.9 MB]
+
+=> Run vsce ls --tree to see all included files.
+
+ DONE  Packaged: /workspaces/waterCodeFlow/extension/watercodeflow-0.1.0.vsix (386 files, 26.42 MB)

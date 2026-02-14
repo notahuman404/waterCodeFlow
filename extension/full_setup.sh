@@ -368,12 +368,14 @@ print_info "Libraries auto-copied during build (via CMake POST_BUILD commands)"
 # List built libraries
 print_info "Built libraries in $EXTENSION_ROOT/build:"
 cd "$EXTENSION_ROOT/build"
-for lib in *.so *.dylib 2>/dev/null; do
+shopt -s nullglob 2>/dev/null || true
+for lib in *.so *.dylib; do
     if [ -f "$lib" ]; then
         SIZE=$(du -h "$lib" | cut -f1)
         echo "  ${GREEN}✓${RESET} $lib ($SIZE)"
     fi
 done
+shopt -u nullglob 2>/dev/null || true
 
 cd "$EXTENSION_ROOT"
 
@@ -450,7 +452,7 @@ npm install -g @vscode/vsce >> "$LOG_FILE" 2>&1
 print_success "vsce installed"
 
 print_step "Packaging extension as .vsix file..."
-vsce package --allow-star-activation >> "$LOG_FILE" 2>&1
+vsce package --allow-package-env-file --allow-star-activation --allow-missing-repository --no-dependencies >> "$LOG_FILE" 2>&1
 print_success "Extension packaged!"
 
 # Find the .vsix file

@@ -6,6 +6,11 @@
   "engines": {
     "vscode": "^1.85.0"
   },
+
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/notahuman404/waterCodeFlow"
+  },
   "categories": ["Debuggers", "Other"],
   "main": "./out/extension.js",
   "activationEvents": [

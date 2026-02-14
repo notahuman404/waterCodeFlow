@@ -391,6 +391,8 @@ _Python3_INCLUDE_DIR:INTERNAL=/home/codespace/.python/current/include/python3.12
 //Python3 Properties
 _Python3_INTERPRETER_PROPERTIES:INTERNAL=Python;3;12;1;64;;cpython-312-x86_64-linux-gnu;abi3;/home/codespace/.python/current/lib/python3.12;/home/codespace/.python/current/lib/python3.12;/home/codespace/.python/current/lib/python3.12/site-packages;/home/codespace/.python/current/lib/python3.12/site-packages
 _Python3_INTERPRETER_SIGNATURE:INTERNAL=bf9e2fa12ff275dbcce6580148af3da5
+//Interpreter reason failure
+_Python3_Interpreter_REASON_FAILURE:INTERNAL=
 //Path to a library.
 _Python3_LIBRARY_RELEASE:INTERNAL=/home/codespace/.python/current/lib/libpython3.12.a
 //NumPy reason failure
