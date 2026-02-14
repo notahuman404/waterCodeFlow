@@ -1,0 +1,1 @@
+/usr/bin/cc -fPIC -O3 -march=native -DNDEBUG -shared -Wl,-soname,faststorage_c.so -o faststorage_c.so CMakeFiles/watcher_faststorage_c.dir/watcher/storage_utility/faststorage.c.o  -lpthread 

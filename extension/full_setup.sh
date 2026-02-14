@@ -361,13 +361,9 @@ else
     exit 1
 fi
 
-# Install libraries to correct locations
-print_step "Installing libraries..."
-if make install >> "$LOG_FILE" 2>&1; then
-    print_success "Libraries installed"
-else
-    print_warning "Library installation had issues (may be OK if already copied)"
-fi
+# Libraries are auto-copied during build via POST_BUILD commands
+# No need for 'make install'
+print_info "Libraries auto-copied during build (via CMake POST_BUILD commands)"
 
 # List built libraries
 print_info "Built libraries in $EXTENSION_ROOT/build:"

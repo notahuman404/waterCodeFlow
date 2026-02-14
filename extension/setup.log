@@ -1,12 +1,98 @@
-Setup started at Sat Feb 14 06:05:41 UTC 2026
-[2026-02-14 06:05:52] Detected OS: linux, Package Manager: apt
-[2026-02-14 06:05:52] Python3 found: 3.12.1
-[2026-02-14 06:05:57] Node.js found: v24.11.1
-CMake Warning:
-  Ignoring extra path from command line:
+Setup started at Sat Feb 14 06:24:33 UTC 2026
+[2026-02-14 06:24:35] Detected OS: linux, Package Manager: apt
+[2026-02-14 06:24:35] Python3 found: 3.12.1
+[2026-02-14 06:24:35] Node.js found: v24.11.1
+[2026-02-14 06:24:35] Running: cmake /workspaces/waterCodeFlow/extension -DCMAKE_BUILD_TYPE=Release
+-- The CXX compiler identification is GNU 13.3.0
+-- The C compiler identification is GNU 13.3.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Found Python3: /home/codespace/.python/current/bin/python3 (found version "3.12.1") found components: Interpreter Development Development.Module Development.Embed 
+-- Python3 found: /home/codespace/.python/current/bin/python3
+-- Python3 include: /home/codespace/.python/current/include/python3.12
+-- Python3 libraries: /home/codespace/.python/current/lib/libpython3.12.a
+-- 
+-- =================================================
+-- WaterCodeFlow Extension - Build Configuration
+-- =================================================
+-- Build Type: Release
+-- C Compiler: /usr/bin/cc
+-- C++ Compiler: /usr/bin/c++
+-- 
+-- Components to build:
+--   ✓ faststorage_c.so (Pure C storage engine)
+--   ✓ watcher_core (C++ watcher framework)
+--   ✓ watcher_python (Python bindings)
+--   ✓ watcher_processor (Custom processor)
+--   ✓ test_core (Unit tests)
+-- 
+-- Python Configuration:
+--   Interpreter: /home/codespace/.python/current/bin/python3
+--   Version: 3.12.1
+--   Include: /home/codespace/.python/current/include/python3.12
+-- 
+-- Install targets:
+--   - faststorage_c.so → storage_utility/
+--   - libwatcher_python.so → build/
+--   - faststorage_c.so → watcher/storage_utility/
+-- =================================================
+-- 
+-- Configuring done (4.3s)
+-- Generating done (0.0s)
+-- Build files have been written to: /workspaces/waterCodeFlow/extension/build
+[2026-02-14 06:24:40] Running: make -j2
+[  8%] Building CXX object CMakeFiles/watcher_core.dir/watcher/core/src/watcher_core.cpp.o
+[ 16%] Building C object CMakeFiles/faststorage_c.dir/storage_utility/faststorage.c.o
+[ 25%] Linking C shared library faststorage_c.so
+[ 25%] Built target faststorage_c
+[ 33%] Building C object CMakeFiles/watcher_faststorage_c.dir/watcher/storage_utility/faststorage.c.o
+[ 41%] Linking C shared library faststorage_c.so
+[ 50%] Linking CXX shared library libwatcher_core.so
+[ 50%] Built target watcher_faststorage_c
+[ 50%] Built target watcher_core
+[ 66%] Building CXX object CMakeFiles/watcher_python.dir/watcher/adapters/python/adapter.cpp.o
+[ 66%] Building CXX object CMakeFiles/watcher_processor.dir/watcher/processor/processor.cpp.o
+In file included from /workspaces/waterCodeFlow/extension/watcher/processor/processor.cpp:1:
+/workspaces/waterCodeFlow/extension/watcher/processor/include/processor.hpp: In member function ‘virtual watcher::processor::ProcessorResponse watcher::processor::NoOpProcessor::processEvent(const watcher::EnrichedEvent&)’:
+/workspaces/waterCodeFlow/extension/watcher/processor/include/processor.hpp:68:66: warning: unused parameter ‘event’ [-Wunused-parameter]
+   68 |     ProcessorResponse processEvent(const watcher::EnrichedEvent& event) override {
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~
+/workspaces/waterCodeFlow/extension/watcher/processor/processor.cpp: In static member function ‘static std::unique_ptr<watcher::processor::CustomProcessor> watcher::processor::ProcessorFactory::createPythonProcessor(const std::string&)’:
+/workspaces/waterCodeFlow/extension/watcher/processor/processor.cpp:24:93: warning: unused parameter ‘script_path’ [-Wunused-parameter]
+   24 | std::unique_ptr<CustomProcessor> ProcessorFactory::createPythonProcessor(const std::string& script_path) {
+      |                                                                          ~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+/workspaces/waterCodeFlow/extension/watcher/processor/processor.cpp: In static member function ‘static std::unique_ptr<watcher::processor::CustomProcessor> watcher::processor::ProcessorFactory::createJavaScriptProcessor(const std::string&)’:
+/workspaces/waterCodeFlow/extension/watcher/processor/processor.cpp:29:97: warning: unused parameter ‘script_path’ [-Wunused-parameter]
+   29 | std::unique_ptr<CustomProcessor> ProcessorFactory::createJavaScriptProcessor(const std::string& script_path) {
+      |                                                                              ~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+[ 75%] Linking CXX shared library libwatcher_processor.so
+[ 75%] Built target watcher_processor
+[ 83%] Building CXX object CMakeFiles/test_core.dir/watcher/tests/test_core.cpp.o
+[ 91%] Linking CXX shared library libwatcher_python.so
+[ 91%] Built target watcher_python
+[100%] Linking CXX executable test_core
+[100%] Built target test_core
+[ 16%] Built target faststorage_c
+[ 33%] Built target watcher_core
+[ 50%] Built target watcher_python
+[ 66%] Built target watcher_processor
+[ 83%] Built target watcher_faststorage_c
+[100%] Built target test_core
+Install the project...
+-- Install configuration: "Release"
+-- Installing: /workspaces/waterCodeFlow/extension/storage_utility/faststorage_c.so
+CMake Error at cmake_install.cmake:87 (file):
+  file INSTALL cannot find
+  "/workspaces/waterCodeFlow/extension/build/libwatcher_python.so": No such
+  file or directory.
 
-   ".."
 
-
-CMake Error: The source directory "/workspaces/waterCodeFlow/extension" does not appear to contain CMakeLists.txt.
-Specify --help for usage, or press the help button on the CMake GUI.
+make: *** [Makefile:110: install] Error 1

@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -O3 -march=native -DNDEBUG -shared -Wl,-soname,libwatcher_python.so -o libwatcher_python.so CMakeFiles/watcher_python.dir/watcher/adapters/python/adapter.cpp.o  -Wl,-rpath,/workspaces/waterCodeFlow/extension/build: libwatcher_core.so /home/codespace/.python/current/lib/libpython3.12.a -lpthread 

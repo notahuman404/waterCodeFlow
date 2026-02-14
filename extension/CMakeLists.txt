@@ -46,9 +46,12 @@ set_target_properties(faststorage_c PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
 
-# Install to storage_utility directory
-install(TARGETS faststorage_c
-    LIBRARY DESTINATION ${CMAKE_SOURCE_DIR}/storage_utility
+# Copy to storage_utility after build
+add_custom_command(TARGET faststorage_c POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_BINARY_DIR}/faststorage_c.so
+        ${CMAKE_SOURCE_DIR}/storage_utility/faststorage_c.so
+    COMMENT "Copying faststorage_c.so to storage_utility/"
 )
 
 # ============================================================================
@@ -100,15 +103,16 @@ target_link_libraries(watcher_python
     pthread
 )
 
+# Keep the lib prefix and output to build directory
 set_target_properties(watcher_python PROPERTIES
     PREFIX "lib"
     SUFFIX ".so"
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
 
-# Install to build directory for Python to find
-install(TARGETS watcher_python
-    LIBRARY DESTINATION ${CMAKE_SOURCE_DIR}/build
+# No need to copy - Python will import from build/ directly
+add_custom_command(TARGET watcher_python POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "✓ libwatcher_python.so is ready in build/"
 )
 
 # ============================================================================
@@ -162,12 +166,15 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/watcher/storage_utility/faststorage.c")
         PREFIX ""
         SUFFIX ".so"
         OUTPUT_NAME "faststorage_c"
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/watcher_storage"
     )
-
-    # Install to watcher/storage_utility directory
-    install(TARGETS watcher_faststorage_c
-        LIBRARY DESTINATION ${CMAKE_SOURCE_DIR}/watcher/storage_utility
+    
+    # Copy to watcher/storage_utility after build
+    add_custom_command(TARGET watcher_faststorage_c POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_BINARY_DIR}/watcher_storage/faststorage_c.so
+            ${CMAKE_SOURCE_DIR}/watcher/storage_utility/faststorage_c.so
+        COMMENT "Copying faststorage_c.so to watcher/storage_utility/"
     )
 endif()
 
@@ -187,6 +194,10 @@ target_include_directories(test_core
 
 target_link_libraries(test_core
     watcher_core
+)
+
+set_target_properties(test_core PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
 
 add_test(NAME CoreTests COMMAND test_core)
@@ -215,12 +226,15 @@ message(STATUS "  Interpreter: ${Python3_EXECUTABLE}")
 message(STATUS "  Version: ${Python3_VERSION}")
 message(STATUS "  Include: ${Python3_INCLUDE_DIRS}")
 message(STATUS "")
-message(STATUS "Install targets:")
+message(STATUS "Build output → ${CMAKE_BINARY_DIR}/")
+message(STATUS "")
+message(STATUS "Auto-copy after build:")
 message(STATUS "  - faststorage_c.so → storage_utility/")
-message(STATUS "  - libwatcher_python.so → build/")
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/watcher/storage_utility/faststorage.c")
     message(STATUS "  - faststorage_c.so → watcher/storage_utility/")
 endif()
+message(STATUS "  - libwatcher_python.so stays in build/")
+message(STATUS "")
+message(STATUS "Note: Run 'make' only - no need for 'make install'")
 message(STATUS "=================================================")
 message(STATUS "")
-
