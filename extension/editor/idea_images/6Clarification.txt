@@ -1,1 +1,0 @@
-The user shoud have the ability to click on the recordings and the the page in the later images should be accesscible. It should not be just static but should be interactive
