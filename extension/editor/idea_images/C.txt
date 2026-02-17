@@ -1,0 +1,53 @@
+Note:
+Make the run buttons yourself where for supported langs it uses the 
+watcher cli and for non supported langs it just normally runs them 
+no optimization for langs like c++/c using o2/o3 only 01 will be used
+1.Buttons should be in same order as image with same icons
+2. Clicking on the eye icon should open a side panel on the left side 
+with the functionality depicted in the image and it should be functional where 
+that box after each variables name denote if it is gettign tracked or no, and local/global/both 
+tell that if the var is local/global or does its name appear in both local and global
+3. Clicking on the eye icon on the sidepanel should make a second drop down appear 
+which tells if to track for single run or multiple runs 
+4.Clicking on that gear icons creates a sidepanel with all the buttons 
+and options in the image where models of ai are gemini, chatgpt and claude
+and the log levels are info and debug
+
+5.Clicking on that camera button creates a new sidepanel which shows 
+file paths of all the files, and the tick there denotes if it will be recorded or no image 
+might be a little enlarged for the side panel part but have to make it seamless
+6.Clicking on the tape recording icon makes a new sidepanel appear which 
+shows the recorded vars/files where variable section is to display change 
+of a single variable and run section is to showcase change of variable 
+of a run
+
+7.When clicked the file recording of the side panel of recordings a new down 
+panel appears where the scrollbar is for going back and front in file where 
+those points denote a diff and the total number of those points 
+will always should be same as total number of diffs
+recording branches are to showcase branches name and when clicks it shows 
+the branches name in form of 
+branch_name     rename  
+where when clicked rename it gives user ability to rename it in the down panel 
+or when the user doesnt click the rename but clicks the branch_name 
+then it switches the branches and goes to it absolute head
+
+8.when the user clicks insight on the down panel an interactiev webview appears 
+which shows the user the recording tree with this pattern 
+a new branch -> 1 then make it above, 2 then above and down, 3 then 2 above 1 down 
+where each node denotes the diff points, main branch line has cyan nodes and yellow nodes 
+denote that that point is selected for getting insight only 2 of those nodes 
+can be selected, the image it might not be shown but it has to be implement 
+that first click makes the node red and slects it and the second click makes the 
+node yellow and selects it, it is decided to denote before and after 
+9. when the single variable is clicked in the recording side panel 
+it creates a webview with the major section being taken up to show the variable data that is to print it 
+side panel of the webview shows the meta data 
+the down scrollbar shows the mutation points 
+
+10.this image appears when the user clicks on a run on the side panel of the tape 
+each variable gets its own section with its display and side part shows metadata and its own scrollbar which gets to its mutation 
+the down scrollbar is the global one when changes it makes it so all variables scrollbar go to the point of what the variable 
+was when that specifc line executed and changed the variable 
+the top part shows the code line and the line no, one more field that is to be added to the top showcase and the side meta data bar 
+is the file path whcih shows the file path.
