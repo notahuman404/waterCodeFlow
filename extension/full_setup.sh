@@ -1,21 +1,27 @@
 #!/bin/bash
 # ============================================================================
-# WATERCODEFLOW EXTENSION - COMPLETE AUTOMATED SETUP (FIXED)
+# WATERCODEFLOW EXTENSION - COMPLETE AUTOMATED SETUP
 # ============================================================================
 # This script does EVERYTHING to set up the extension:
-# 1. Checks and installs system dependencies
-# 2. Fixes all hardcoded paths automatically
-# 3. Builds C++ components (FIXED: now uses root CMakeLists.txt)
-# 4. Installs Python dependencies
-# 5. Installs Node.js dependencies
-# 6. Compiles TypeScript
-# 7. Packages extension as .vsix file
-# 8. Provides installation instructions
+#   1.  Checks and installs system dependencies
+#   2.  Fixes hardcoded paths in watcher test files
+#   3.  Builds C++ components (storage, watcher core, adapters, processor)
+#   4.  Copies built libraries to their expected locations
+#   5.  Installs Python dependencies (CodeVovle + glue)
+#   6.  Installs Node.js dependencies inside editor/
+#   7.  Compiles TypeScript inside editor/
+#   8.  Packages the extension as a .vsix file
+#   9.  Prints installation instructions
+#
+# Usage:
+#   chmod +x full_setup.sh
+#   ./full_setup.sh
 # ============================================================================
 
-set -e  # Exit on any error
+set -e
 
-# Colors for output
+# ── Colours ──────────────────────────────────────────────────────────────────
+
 BOLD='\033[1m'
 GREEN='\033[92m'
 RED='\033[91m'
@@ -24,17 +30,16 @@ BLUE='\033[94m'
 CYAN='\033[96m'
 RESET='\033[0m'
 
-# Get the directory where this script is located (extension root)
-EXTENSION_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$EXTENSION_ROOT"
+# ── Paths ─────────────────────────────────────────────────────────────────────
 
-# Log file
+EXTENSION_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EDITOR_DIR="$EXTENSION_ROOT/editor"
 LOG_FILE="$EXTENSION_ROOT/setup.log"
+
+cd "$EXTENSION_ROOT"
 echo "Setup started at $(date)" > "$LOG_FILE"
 
-# ============================================================================
-# Helper Functions
-# ============================================================================
+# ── Helper functions ──────────────────────────────────────────────────────────
 
 print_header() {
     echo -e "\n${BOLD}${CYAN}╔════════════════════════════════════════════════════════════════╗${RESET}"
@@ -42,473 +47,538 @@ print_header() {
     echo -e "${BOLD}${CYAN}╚════════════════════════════════════════════════════════════════╝${RESET}\n"
 }
 
-print_step() {
-    echo -e "${BOLD}${BLUE}▶ $1${RESET}"
-}
-
-print_success() {
-    echo -e "${GREEN}✓ $1${RESET}"
-}
-
-print_error() {
-    echo -e "${RED}✗ $1${RESET}"
-}
-
-print_warning() {
-    echo -e "${YELLOW}⚠ $1${RESET}"
-}
-
-print_info() {
-    echo -e "${CYAN}ℹ $1${RESET}"
-}
+print_step()    { echo -e "${BOLD}${BLUE}▶ $1${RESET}"; }
+print_success() { echo -e "${GREEN}✓ $1${RESET}"; }
+print_error()   { echo -e "${RED}✗ $1${RESET}"; }
+print_warning() { echo -e "${YELLOW}⚠ $1${RESET}"; }
+print_info()    { echo -e "${CYAN}ℹ $1${RESET}"; }
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
 }
 
 check_command() {
-    local cmd=$1
-    if command -v "$cmd" &> /dev/null; then
-        return 0
-    else
-        return 1
-    fi
+    command -v "$1" &>/dev/null
 }
 
-# Detect OS
+# Detect OS and package manager
 detect_os() {
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        OS="mac"
+        PKG_MANAGER="brew"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         OS="linux"
-        if command -v apt-get &> /dev/null; then
+        if check_command apt-get; then
             PKG_MANAGER="apt"
-        elif command -v yum &> /dev/null; then
-            PKG_MANAGER="yum"
-        elif command -v dnf &> /dev/null; then
+        elif check_command dnf; then
             PKG_MANAGER="dnf"
+        elif check_command yum; then
+            PKG_MANAGER="yum"
         else
             PKG_MANAGER="unknown"
         fi
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        OS="mac"
-        PKG_MANAGER="brew"
     else
         OS="unknown"
         PKG_MANAGER="unknown"
     fi
 }
 
-# ============================================================================
-# Main Setup Process
-# ============================================================================
+# Install a package via the detected package manager
+install_pkg() {
+    local pkg_apt="$1"
+    local pkg_brew="${2:-$1}"
+    local pkg_label="${3:-$1}"
 
-print_header "WATERCODEFLOW EXTENSION - AUTOMATED SETUP"
+    print_info "Installing $pkg_label..."
+    if [[ "$PKG_MANAGER" == "apt" ]]; then
+        sudo apt-get update -qq > /dev/null 2>&1
+        sudo apt-get install -y "$pkg_apt" >> "$LOG_FILE" 2>&1
+    elif [[ "$PKG_MANAGER" == "brew" ]]; then
+        brew install "$pkg_brew" >> "$LOG_FILE" 2>&1
+    elif [[ "$PKG_MANAGER" == "dnf" || "$PKG_MANAGER" == "yum" ]]; then
+        sudo "$PKG_MANAGER" install -y "$pkg_apt" >> "$LOG_FILE" 2>&1
+    else
+        print_error "Cannot install $pkg_label automatically — please install it manually then re-run."
+        exit 1
+    fi
+    print_success "$pkg_label installed"
+}
+
+# ── Banner ────────────────────────────────────────────────────────────────────
+
+print_header "WATERCODEFLOW EXTENSION — AUTOMATED SETUP"
 
 echo -e "${BOLD}This script will:${RESET}"
-echo "  1. Check and install system dependencies"
-echo "  2. Fix all hardcoded paths in the code"
-echo "  3. Build C++ components"
-echo "  4. Install Python dependencies"
-echo "  5. Install Node.js dependencies"
-echo "  6. Compile TypeScript code"
-echo "  7. Package the extension as .vsix file"
+echo "  1.  Check and install system dependencies"
+echo "  2.  Fix hardcoded paths in watcher test files"
+echo "  3.  Build C++ components"
+echo "  4.  Copy libraries to their expected locations"
+echo "  5.  Install Python dependencies"
+echo "  6.  Install Node.js dependencies (inside editor/)"
+echo "  7.  Compile TypeScript (inside editor/)"
+echo "  8.  Package the extension as a .vsix file"
 echo ""
-echo -e "${YELLOW}This may take 5-10 minutes depending on your system.${RESET}"
+echo -e "${YELLOW}This may take 5–10 minutes depending on your system.${RESET}"
 echo ""
-read -p "Continue? (Y/n): " confirm
+
+read -rp "Continue? (Y/n): " confirm
 if [[ "$confirm" == "n" || "$confirm" == "N" ]]; then
     echo "Setup cancelled."
     exit 0
 fi
 
-# Detect OS
+# Preflight: editor/ must exist with its package.json
+if [ ! -f "$EDITOR_DIR/package.json" ]; then
+    echo ""
+    print_error "editor/package.json not found."
+    print_info  "Place the watercodeflow editor directory at:"
+    print_info  "  $EDITOR_DIR"
+    print_info  "It must contain: src/, media/, package.json, tsconfig.json, glue/"
+    exit 1
+fi
+
 detect_os
-log "Detected OS: $OS, Package Manager: $PKG_MANAGER"
+log "OS: $OS  PKG_MANAGER: $PKG_MANAGER  ROOT: $EXTENSION_ROOT"
 print_info "Detected OS: $OS"
+echo ""
 
 # ============================================================================
-# Step 1: Check and Install System Dependencies
+# STEP 1: System dependencies
 # ============================================================================
 
 print_header "STEP 1: SYSTEM DEPENDENCIES"
 
-# Check Python 3
+# ── Python 3 ──
 print_step "Checking Python 3..."
 if check_command python3; then
-    PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
-    print_success "Python 3 installed: $PYTHON_VERSION"
-    log "Python3 found: $PYTHON_VERSION"
+    PY_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
+    print_success "Python 3 found: $PY_VERSION"
+    log "Python3: $PY_VERSION"
 else
-    print_error "Python 3 not found"
+    print_warning "Python 3 not found — installing..."
     if [[ "$PKG_MANAGER" == "apt" ]]; then
-        print_info "Installing Python 3..."
-        sudo apt-get update > /dev/null 2>&1
-        sudo apt-get install -y python3 python3-pip python3-dev >> "$LOG_FILE" 2>&1
-        print_success "Python 3 installed"
-    elif [[ "$PKG_MANAGER" == "brew" ]]; then
-        print_info "Installing Python 3..."
-        brew install python3 >> "$LOG_FILE" 2>&1
-        print_success "Python 3 installed"
+        install_pkg "python3 python3-pip python3-dev" "" "Python 3"
     else
-        print_error "Cannot install Python 3 automatically. Please install manually."
-        exit 1
+        install_pkg "python3" "python3" "Python 3"
     fi
 fi
 
-# Check pip
-print_step "Checking pip..."
-if python3 -m pip --version > /dev/null 2>&1; then
-    print_success "pip installed"
-else
-    print_info "Installing pip..."
-    if [[ "$PKG_MANAGER" == "apt" ]]; then
-        sudo apt-get install -y python3-pip >> "$LOG_FILE" 2>&1
-    elif [[ "$PKG_MANAGER" == "brew" ]]; then
-        python3 -m ensurepip >> "$LOG_FILE" 2>&1
-    fi
-    print_success "pip installed"
-fi
-
-# Check Node.js
-print_step "Checking Node.js..."
-if check_command node; then
-    NODE_VERSION=$(node --version)
-    print_success "Node.js installed: $NODE_VERSION"
-    log "Node.js found: $NODE_VERSION"
-else
-    print_error "Node.js not found"
-    if [[ "$PKG_MANAGER" == "apt" ]]; then
-        print_info "Installing Node.js..."
-        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - >> "$LOG_FILE" 2>&1
-        sudo apt-get install -y nodejs >> "$LOG_FILE" 2>&1
-        print_success "Node.js installed"
-    elif [[ "$PKG_MANAGER" == "brew" ]]; then
-        print_info "Installing Node.js..."
-        brew install node >> "$LOG_FILE" 2>&1
-        print_success "Node.js installed"
-    else
-        print_error "Cannot install Node.js automatically. Please install from https://nodejs.org"
-        exit 1
-    fi
-fi
-
-# Check npm
-print_step "Checking npm..."
-if check_command npm; then
-    NPM_VERSION=$(npm --version)
-    print_success "npm installed: $NPM_VERSION"
-else
-    print_error "npm not found (should come with Node.js)"
+# Version gate: need 3.8+
+PY_MAJOR=$(python3 -c "import sys; print(sys.version_info.major)")
+PY_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
+if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 8 ]; }; then
+    print_error "Python $(python3 --version 2>&1 | awk '{print $2}') is too old — Python 3.8+ required."
     exit 1
 fi
 
-# Check C++ compiler
-print_step "Checking C++ compiler..."
-if check_command g++ || check_command clang++; then
-    if check_command g++; then
-        CXX_VERSION=$(g++ --version | head -1)
-        print_success "g++ installed: $CXX_VERSION"
-    else
-        CXX_VERSION=$(clang++ --version | head -1)
-        print_success "clang++ installed: $CXX_VERSION"
-    fi
+# ── pip ──
+print_step "Checking pip..."
+if python3 -m pip --version > /dev/null 2>&1; then
+    print_success "pip available"
 else
-    print_error "C++ compiler not found"
+    print_warning "pip not found — installing..."
     if [[ "$PKG_MANAGER" == "apt" ]]; then
-        print_info "Installing build-essential..."
-        sudo apt-get install -y build-essential >> "$LOG_FILE" 2>&1
-        print_success "build-essential installed"
+        install_pkg "python3-pip" "" "pip"
+    else
+        python3 -m ensurepip --upgrade >> "$LOG_FILE" 2>&1
+        print_success "pip installed"
+    fi
+fi
+
+# ── Node.js ──
+print_step "Checking Node.js..."
+if check_command node; then
+    NODE_VERSION=$(node --version)
+    print_success "Node.js found: $NODE_VERSION"
+    log "Node.js: $NODE_VERSION"
+else
+    print_warning "Node.js not found — installing..."
+    if [[ "$PKG_MANAGER" == "apt" ]]; then
+        print_info "Fetching Node.js 20.x setup script..."
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - >> "$LOG_FILE" 2>&1
+        install_pkg "nodejs" "" "Node.js 20"
+    elif [[ "$PKG_MANAGER" == "brew" ]]; then
+        install_pkg "" "node" "Node.js"
+    else
+        print_error "Cannot install Node.js automatically. Install from https://nodejs.org then re-run."
+        exit 1
+    fi
+fi
+
+# Node version gate: need 16+
+NODE_MAJOR=$(node --version | tr -d 'v' | cut -d. -f1)
+if [ "$NODE_MAJOR" -lt 16 ]; then
+    print_error "Node.js $(node --version) is too old — Node 16+ required."
+    exit 1
+fi
+
+# ── npm ──
+print_step "Checking npm..."
+if check_command npm; then
+    print_success "npm found: $(npm --version)"
+else
+    print_error "npm not found (should ship with Node.js). Check your installation."
+    exit 1
+fi
+
+# ── C++ compiler ──
+print_step "Checking C++ compiler..."
+if check_command g++; then
+    print_success "g++ found: $(g++ --version | head -1)"
+    log "g++: $(g++ --version | head -1)"
+elif check_command clang++; then
+    print_success "clang++ found: $(clang++ --version | head -1)"
+    log "clang++: $(clang++ --version | head -1)"
+else
+    print_warning "C++ compiler not found — installing..."
+    if [[ "$PKG_MANAGER" == "apt" ]]; then
+        install_pkg "build-essential" "" "build-essential"
     elif [[ "$PKG_MANAGER" == "brew" ]]; then
         print_info "Installing Xcode Command Line Tools..."
         xcode-select --install >> "$LOG_FILE" 2>&1 || true
         print_success "Xcode tools installed"
     else
-        print_error "Cannot install C++ compiler automatically. Please install manually."
+        print_error "Cannot install a C++ compiler automatically — please install one manually."
         exit 1
     fi
 fi
 
-# Check CMake
+# ── CMake ──
 print_step "Checking CMake..."
 if check_command cmake; then
-    CMAKE_VERSION=$(cmake --version | head -1)
-    print_success "CMake installed: $CMAKE_VERSION"
+    print_success "CMake found: $(cmake --version | head -1)"
+    log "CMake: $(cmake --version | head -1)"
 else
-    print_error "CMake not found"
-    if [[ "$PKG_MANAGER" == "apt" ]]; then
-        print_info "Installing CMake..."
-        sudo apt-get install -y cmake >> "$LOG_FILE" 2>&1
-        print_success "CMake installed"
-    elif [[ "$PKG_MANAGER" == "brew" ]]; then
-        print_info "Installing CMake..."
-        brew install cmake >> "$LOG_FILE" 2>&1
-        print_success "CMake installed"
+    print_warning "CMake not found — installing..."
+    if [[ "$PKG_MANAGER" == "brew" ]]; then
+        install_pkg "" "cmake" "CMake"
     else
-        print_error "Cannot install CMake automatically. Please install from https://cmake.org"
-        exit 1
+        install_pkg "cmake" "cmake" "CMake"
     fi
 fi
 
+print_success "All system dependencies satisfied"
+
 # ============================================================================
-# Step 2: Fix Hardcoded Paths
+# STEP 2: Fix hardcoded paths in watcher test files
 # ============================================================================
 
 print_header "STEP 2: FIXING HARDCODED PATHS"
 
-print_step "Fixing hardcoded paths in test files..."
+print_step "Scanning watcher test files for hardcoded /workspaces/WaterCodeFlow paths..."
 
-# Create a Python script to fix all test files at once
-cat > /tmp/fix_paths.py << 'PYEOF'
-#!/usr/bin/env python3
-import re
+python3 - "$EXTENSION_ROOT" << 'PYEOF'
+import re, sys
 from pathlib import Path
 
-# Files to fix
-files_to_fix = [
-    "tests/test_mutations.py",
-    "tests/test_javascript_loader.py",
-    "tests/test_javascript_processor.py",
-    "tests/test_functionality.py",
-    "tests/test_real_mutations.py"
-]
+root = Path(sys.argv[1])
+tests_dir = root / "watcher" / "tests"
 
-extension_root = Path.cwd()
+fixed = []
+skipped = []
 
-for file_path in files_to_fix:
-    full_path = extension_root / file_path
-    if not full_path.exists():
-        continue
-    
-    with open(full_path, 'r') as f:
-        content = f.read()
-    
-    # Replace the hardcoded paths
-    content = re.sub(
-        r"sys\.path\.insert\(0, '/workspaces/WaterCodeFlow'\)",
-        """# Get the extension root directory
-EXTENSION_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(EXTENSION_ROOT))""",
-        content
-    )
-    
-    content = re.sub(
-        r"os\.environ\['LD_LIBRARY_PATH'\] = '/workspaces/WaterCodeFlow/build:' \+ os\.environ\.get\('LD_LIBRARY_PATH', ''\)",
-        "os.environ['LD_LIBRARY_PATH'] = str(EXTENSION_ROOT / 'build') + ':' + os.environ.get('LD_LIBRARY_PATH', '')",
-        content
-    )
-    
-    content = re.sub(
-        r"lib_path = Path\('/workspaces/WaterCodeFlow/build/libwatcher_python\.so'\)",
-        "lib_path = EXTENSION_ROOT / 'build' / 'libwatcher_python.so'",
-        content
-    )
-    
-    with open(full_path, 'w') as f:
-        f.write(content)
-    
-    print(f"Fixed: {file_path}")
+if not tests_dir.exists():
+    print(f"  watcher/tests/ not found — nothing to fix")
+    sys.exit(0)
 
-print("All hardcoded paths fixed!")
+for py_file in sorted(tests_dir.glob("*.py")):
+    content = py_file.read_text(encoding="utf-8")
+    original = content
+
+    # sys.path.insert(0, '/workspaces/WaterCodeFlow')
+    content = re.sub(
+        r"sys\.path\.insert\(0,\s*['\"]\/workspaces\/WaterCodeFlow['\"]\)",
+        "sys.path.insert(0, str(Path(__file__).parent.parent.parent))",
+        content,
+    )
+
+    # os.environ['LD_LIBRARY_PATH'] = '/workspaces/WaterCodeFlow/build:' + ...
+    content = re.sub(
+        r"os\.environ\[(['\"])LD_LIBRARY_PATH\1\]\s*=\s*['\"]\/workspaces\/WaterCodeFlow\/build:['\"]"
+        r"\s*\+\s*os\.environ\.get\(['\"]LD_LIBRARY_PATH['\"],\s*['\"]['\]\)",
+        "os.environ['LD_LIBRARY_PATH'] = str(Path(__file__).parent.parent.parent / 'build') + ':' + os.environ.get('LD_LIBRARY_PATH', '')",
+        content,
+    )
+
+    # lib_path = Path('/workspaces/WaterCodeFlow/build/libwatcher_python.so')
+    content = re.sub(
+        r"lib_path\s*=\s*Path\(['\"]\/workspaces\/WaterCodeFlow\/build\/libwatcher_python\.so['\"]\)",
+        "lib_path = Path(__file__).parent.parent.parent / 'build' / 'libwatcher_python.so'",
+        content,
+    )
+
+    if content != original:
+        py_file.write_text(content, encoding="utf-8")
+        fixed.append(py_file.name)
+    else:
+        skipped.append(py_file.name)
+
+if fixed:
+    for f in fixed:
+        print(f"  \033[92m✓\033[0m Fixed: {f}")
+else:
+    print("  All test files already have portable paths — nothing to change")
 PYEOF
 
-python3 /tmp/fix_paths.py
-print_success "All hardcoded paths fixed!"
-rm /tmp/fix_paths.py
+print_success "Path check complete"
 
 # ============================================================================
-# Step 3: Build C++ Components (FIXED)
+# STEP 3: Build C++ components
 # ============================================================================
 
 print_header "STEP 3: BUILDING C++ COMPONENTS"
 
-print_step "Checking for CMakeLists.txt in extension root..."
 if [ ! -f "$EXTENSION_ROOT/CMakeLists.txt" ]; then
-    print_error "CMakeLists.txt not found in extension root!"
-    print_error "Please place the CMakeLists.txt file in: $EXTENSION_ROOT"
-    print_info "The CMakeLists.txt should build all components:"
-    print_info "  - storage_utility/faststorage.c"
-    print_info "  - watcher/core/src/watcher_core.cpp"
-    print_info "  - watcher/adapters/python/adapter.cpp"
-    print_info "  - watcher/processor/processor.cpp"
+    print_error "CMakeLists.txt not found in extension root ($EXTENSION_ROOT)"
+    print_info  "Expected components:"
+    print_info  "  storage_utility/faststorage.c"
+    print_info  "  watcher/core/src/watcher_core.cpp"
+    print_info  "  watcher/adapters/python/adapter.cpp"
+    print_info  "  watcher/processor/processor.cpp"
     exit 1
-else
-    print_success "Found CMakeLists.txt in extension root"
 fi
+print_success "CMakeLists.txt found"
 
 print_step "Creating build directory..."
 mkdir -p "$EXTENSION_ROOT/build"
-cd "$EXTENSION_ROOT/build"
 
 print_step "Running CMake configuration..."
-log "Running: cmake $EXTENSION_ROOT -DCMAKE_BUILD_TYPE=Release"
-if cmake "$EXTENSION_ROOT" -DCMAKE_BUILD_TYPE=Release >> "$LOG_FILE" 2>&1; then
-    print_success "CMake configured successfully"
-else
-    print_error "CMake configuration failed!"
-    print_error "Check $LOG_FILE for details"
-    tail -n 20 "$LOG_FILE"
-    exit 1
-fi
-
-print_step "Compiling C/C++ libraries..."
-NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
-log "Running: make -j$NPROC"
-if make -j$NPROC >> "$LOG_FILE" 2>&1; then
-    print_success "C/C++ libraries compiled successfully"
-else
-    print_error "Compilation failed!"
-    print_error "Check $LOG_FILE for details"
-    tail -n 30 "$LOG_FILE"
-    exit 1
-fi
-
-# Libraries are auto-copied during build via POST_BUILD commands
-# No need for 'make install'
-print_info "Libraries auto-copied during build (via CMake POST_BUILD commands)"
-
-# List built libraries
-print_info "Built libraries in $EXTENSION_ROOT/build:"
 cd "$EXTENSION_ROOT/build"
-shopt -s nullglob 2>/dev/null || true
-for lib in *.so *.dylib; do
-    if [ -f "$lib" ]; then
-        SIZE=$(du -h "$lib" | cut -f1)
-        echo "  ${GREEN}✓${RESET} $lib ($SIZE)"
-    fi
-done
-shopt -u nullglob 2>/dev/null || true
+log "cmake $EXTENSION_ROOT -DCMAKE_BUILD_TYPE=Release"
+if cmake "$EXTENSION_ROOT" -DCMAKE_BUILD_TYPE=Release >> "$LOG_FILE" 2>&1; then
+    print_success "CMake configured"
+else
+    print_error "CMake configuration failed — see $LOG_FILE"
+    tail -20 "$LOG_FILE"
+    exit 1
+fi
+
+print_step "Compiling..."
+NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
+log "make -j$NPROC"
+if make -j"$NPROC" >> "$LOG_FILE" 2>&1; then
+    print_success "Compilation succeeded ($NPROC parallel jobs)"
+else
+    print_error "Compilation failed — see $LOG_FILE"
+    tail -30 "$LOG_FILE"
+    exit 1
+fi
 
 cd "$EXTENSION_ROOT"
 
-# Verify critical libraries exist
-print_step "Verifying critical libraries..."
-MISSING_LIBS=0
+echo ""
+print_info "Libraries in build/:"
+for lib in build/*.so build/*.dylib; do
+    [ -f "$lib" ] && echo -e "  ${GREEN}✓${RESET} $(basename "$lib")  ($(du -h "$lib" | cut -f1))"
+done
 
-if [ -f "$EXTENSION_ROOT/storage_utility/faststorage_c.so" ]; then
-    print_success "faststorage_c.so found in storage_utility/"
+# ============================================================================
+# STEP 4: Copy libraries to expected locations
+# ============================================================================
+
+print_header "STEP 4: PLACING LIBRARIES"
+
+# faststorage_c.so → storage_utility/  (used by CodeVovle and glue)
+print_step "Placing faststorage_c.so..."
+if [ -f "build/faststorage_c.so" ]; then
+    cp "build/faststorage_c.so" "storage_utility/"
+    print_success "faststorage_c.so → storage_utility/"
+    # Also into watcher/storage_utility/ if it exists
+    if [ -d "watcher/storage_utility" ]; then
+        cp "build/faststorage_c.so" "watcher/storage_utility/"
+        print_success "faststorage_c.so → watcher/storage_utility/"
+    fi
+elif [ -f "storage_utility/faststorage_c.so" ]; then
+    print_success "faststorage_c.so already in storage_utility/"
 else
-    print_warning "faststorage_c.so not found in storage_utility/ (will look in build/)"
-    if [ -f "$EXTENSION_ROOT/build/faststorage_c.so" ]; then
-        print_info "Copying from build/ to storage_utility/"
-        cp "$EXTENSION_ROOT/build/faststorage_c.so" "$EXTENSION_ROOT/storage_utility/"
-        print_success "Copied faststorage_c.so"
+    print_error "faststorage_c.so not found in build/ or storage_utility/"
+    exit 1
+fi
+
+# Watcher shared libraries — must live in build/ (extension.ts resolves them there)
+print_step "Verifying watcher libraries..."
+MISSING=0
+for lib in libwatcher_python.so libwatcher_core.so libwatcher_processor.so; do
+    if [ -f "build/$lib" ]; then
+        print_success "$lib  ($(du -h "build/$lib" | cut -f1))"
     else
-        print_error "faststorage_c.so not found anywhere!"
-        MISSING_LIBS=1
+        print_error "build/$lib not found"
+        MISSING=$((MISSING + 1))
+    fi
+done
+
+if [ "$MISSING" -gt 0 ]; then
+    print_error "$MISSING critical librar$([ $MISSING -eq 1 ] && echo y || echo ies) missing — check $LOG_FILE"
+    exit 1
+fi
+
+# ============================================================================
+# STEP 5: Python dependencies
+# ============================================================================
+
+print_header "STEP 5: PYTHON DEPENDENCIES"
+
+print_step "Upgrading pip..."
+python3 -m pip install --upgrade pip >> "$LOG_FILE" 2>&1
+print_success "pip up to date"
+
+# CodeVovle requirements
+print_step "Installing CodeVovle requirements..."
+if [ -f "$EXTENSION_ROOT/CodeVovle/requirements.txt" ]; then
+    python3 -m pip install -r "$EXTENSION_ROOT/CodeVovle/requirements.txt" >> "$LOG_FILE" 2>&1
+    print_success "CodeVovle/requirements.txt installed"
+else
+    print_warning "CodeVovle/requirements.txt not found — skipping"
+fi
+
+# Common test + runtime deps
+print_step "Installing shared Python packages..."
+python3 -m pip install pytest psutil >> "$LOG_FILE" 2>&1
+print_success "pytest, psutil installed"
+
+# Verify the glue package loads cleanly
+print_step "Verifying glue package..."
+if python3 - << PYCHECK >> "$LOG_FILE" 2>&1
+import sys
+sys.path.insert(0, '$EXTENSION_ROOT')
+from glue import api, runs, variables, watch
+from glue.errors import GlueError
+print("glue ok")
+PYCHECK
+then
+    print_success "glue package imports cleanly"
+else
+    print_warning "glue import had warnings — see $LOG_FILE (non-fatal, CodeVovle not yet installed)"
+fi
+
+# ============================================================================
+# STEP 6: Node.js dependencies
+# ============================================================================
+
+print_header "STEP 6: NODE.JS DEPENDENCIES"
+
+print_step "Running npm install in editor/..."
+cd "$EDITOR_DIR"
+if npm install >> "$LOG_FILE" 2>&1; then
+    PKGS=$(ls node_modules | wc -l | tr -d ' ')
+    print_success "node_modules installed ($PKGS packages)"
+else
+    print_error "npm install failed — see $LOG_FILE"
+    exit 1
+fi
+cd "$EXTENSION_ROOT"
+
+# ============================================================================
+# STEP 7: Compile TypeScript
+# ============================================================================
+
+print_header "STEP 7: COMPILING TYPESCRIPT"
+
+print_step "Building editor/src → editor/out..."
+cd "$EDITOR_DIR"
+if npm run esbuild >> "$LOG_FILE" 2>&1; then
+    print_success "TypeScript compiled → editor/out/"
+else
+    print_error "TypeScript compilation failed — see $LOG_FILE"
+    tail -20 "$LOG_FILE"
+    exit 1
+fi
+cd "$EXTENSION_ROOT"
+
+# Verify key output files
+print_step "Verifying compiled output..."
+OK=0
+for f in out/extension.js out/GlueBridge.js out/utils.js \
+          out/panels/RecordingsPanel.js out/panels/SettingsPanel.js \
+          out/panels/RunInspectorPanel.js out/panels/VariableInspectorPanel.js \
+          out/providers/RecordingViewerProvider.js; do
+    if [ -f "$EDITOR_DIR/$f" ]; then
+        OK=$((OK + 1))
+    else
+        print_warning "editor/$f missing after compilation"
+    fi
+done
+print_success "$OK compiled output files verified"
+
+# ============================================================================
+# STEP 8: Package extension
+# ============================================================================
+
+print_header "STEP 8: PACKAGING EXTENSION"
+
+cd "$EDITOR_DIR"
+
+print_step "Checking for vsce..."
+if check_command vsce; then
+    print_success "vsce found: $(vsce --version 2>/dev/null)"
+else
+    print_info "Installing @vscode/vsce globally..."
+    npm install -g @vscode/vsce >> "$LOG_FILE" 2>&1
+    if check_command vsce; then
+        print_success "vsce installed: $(vsce --version 2>/dev/null)"
+    else
+        print_error "vsce installation failed — see $LOG_FILE"
+        exit 1
     fi
 fi
 
-if [ -f "$EXTENSION_ROOT/build/libwatcher_python.so" ]; then
-    print_success "libwatcher_python.so found in build/"
+print_step "Packaging as .vsix..."
+if vsce package \
+    --allow-missing-repository \
+    --no-dependencies \
+    --allow-package-env-file --allow-star-activation \
+    >> "$LOG_FILE" 2>&1; then
+    print_success "Extension packaged"
 else
-    print_error "libwatcher_python.so not found in build/!"
-    MISSING_LIBS=1
-fi
-
-if [ $MISSING_LIBS -eq 1 ]; then
-    print_error "Some critical libraries are missing!"
-    print_error "Build may have failed. Check $LOG_FILE"
+    print_error "vsce package failed — see $LOG_FILE"
+    tail -20 "$LOG_FILE"
     exit 1
 fi
 
-# ============================================================================
-# Step 4: Install Python Dependencies
-# ============================================================================
-
-print_header "STEP 4: PYTHON DEPENDENCIES"
-
-print_step "Installing Python packages..."
-python3 -m pip install --upgrade pip >> "$LOG_FILE" 2>&1
-python3 -m pip install pytest psutil >> "$LOG_FILE" 2>&1
-print_success "Python packages installed (pytest, psutil)"
-
-# ============================================================================
-# Step 5: Install Node.js Dependencies
-# ============================================================================
-
-print_header "STEP 5: NODE.JS DEPENDENCIES"
-
-print_step "Installing npm packages..."
-npm install >> "$LOG_FILE" 2>&1
-print_success "npm packages installed"
-
-# ============================================================================
-# Step 6: Compile TypeScript
-# ============================================================================
-
-print_header "STEP 6: COMPILING TYPESCRIPT"
-
-print_step "Building TypeScript code..."
-npm run esbuild >> "$LOG_FILE" 2>&1
-print_success "TypeScript compiled to out/extension.js"
-
-# ============================================================================
-# Step 7: Package Extension
-# ============================================================================
-
-print_header "STEP 7: PACKAGING EXTENSION"
-
-print_step "Checking if vsce is installed..."
-
-if command -v vsce >/dev/null 2>&1; then
-    print_success "vsce already installed"
-else
-    print_step "Installing vsce (VS Code Extension Manager)..."
-    npm install -g @vscode/vsce >> "$LOG_FILE" 2>&1
-    print_success "vsce installed"
-fi
-
-
-print_step "Packaging extension as .vsix file..."
-vsce package --allow-package-env-file --allow-star-activation --allow-missing-repository --no-dependencies >> "$LOG_FILE" 2>&1
-print_success "Extension packaged!"
-
-# Find the .vsix file
-VSIX_FILE=$(ls -t *.vsix 2>/dev/null | head -1)
-
-if [ -n "$VSIX_FILE" ]; then
-    VSIX_SIZE=$(du -h "$VSIX_FILE" | cut -f1)
-    print_success "Created: $VSIX_FILE ($VSIX_SIZE)"
-else
-    print_error "Could not find .vsix file"
+VSIX_FILE=$(ls -t "$EDITOR_DIR"/*.vsix 2>/dev/null | head -1)
+if [ -z "$VSIX_FILE" ]; then
+    print_error "No .vsix file found after packaging"
     exit 1
 fi
 
+VSIX_SIZE=$(du -h "$VSIX_FILE" | cut -f1)
+print_success "Created: $(basename "$VSIX_FILE")  ($VSIX_SIZE)"
+
+cd "$EXTENSION_ROOT"
+
 # ============================================================================
-# Final Success Message
+# Done
 # ============================================================================
 
 print_header "SETUP COMPLETE!"
 
-echo -e "${BOLD}${GREEN}✓ All steps completed successfully!${RESET}\n"
+echo -e "${BOLD}${GREEN}✓ All 8 steps completed successfully!${RESET}\n"
 
-echo -e "${BOLD}📦 Extension Package:${RESET}"
-echo -e "  ${CYAN}$VSIX_FILE${RESET}"
+echo -e "${BOLD}📦 Extension package:${RESET}"
+echo -e "   ${CYAN}$VSIX_FILE${RESET}"
 echo ""
 
-echo -e "${BOLD}📥 To Install in VS Code:${RESET}"
-echo -e "  ${YELLOW}Method 1 - VS Code UI:${RESET}"
-echo "    1. Open VS Code"
-echo "    2. Go to Extensions (Ctrl+Shift+X or Cmd+Shift+X)"
-echo "    3. Click '...' menu → 'Install from VSIX...'"
-echo "    4. Select: $EXTENSION_ROOT/$VSIX_FILE"
+echo -e "${BOLD}📥 Install in VS Code:${RESET}"
+echo -e "   ${YELLOW}Method 1 — Command line:${RESET}"
+echo -e "     code --install-extension \"$VSIX_FILE\""
 echo ""
-echo -e "  ${YELLOW}Method 2 - Command Line:${RESET}"
-echo "    code --install-extension $VSIX_FILE"
+echo -e "   ${YELLOW}Method 2 — VS Code UI:${RESET}"
+echo "     Extensions (Ctrl+Shift+X) → ⋯ → Install from VSIX…"
+echo "     Select: $VSIX_FILE"
 echo ""
 
-echo -e "${BOLD}📚 Quick Start:${RESET}"
-echo "  1. Install the extension using one of the methods above"
-echo "  2. Open a Python file in VS Code"
-echo "  3. Click the WaterCodeFlow icon in the Activity Bar"
-echo "  4. Start recording and debug with time-travel!"
+echo -e "${BOLD}📚 Quick start:${RESET}"
+echo "   1. Open a Python file in VS Code"
+echo "   2. Click the WaterCodeFlow icon in the Activity Bar"
+echo "   3. Press ▶ to run and start recording"
+echo "   4. Inspect variables with the 👁 watcher button"
 echo ""
 
-echo -e "${BOLD}📄 Documentation:${RESET}"
-echo "  • README.md - Project overview"
-echo "  • QUICK_REFERENCE.md - Quick start guide"
+echo -e "${BOLD}📄 Docs:${RESET}"
+echo "   • README.md          — project overview"
+echo "   • QUICK_REFERENCE.md — quick-start commands"
 echo ""
 
-echo -e "${YELLOW}Setup log saved to: $LOG_FILE${RESET}"
+echo -e "${YELLOW}Setup log: $LOG_FILE${RESET}"
 echo ""
-
-echo -e "${BOLD}${GREEN}🎉 You're ready to go! Install the extension and start debugging!${RESET}\n"
+echo -e "${BOLD}${GREEN}🎉 You're ready to go!${RESET}\n"
