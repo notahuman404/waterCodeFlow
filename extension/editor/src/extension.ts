@@ -113,6 +113,7 @@ export function activate(context: vscode.ExtensionContext) {
                         onStderr: chunk => notifyPanel('run.stderr', chunk),
                     });
                     notifyPanel('run.done', JSON.stringify(result));
+                    await variablesProvider.onRunDone(filePath);
                 } catch (err: any) {
                     notifyPanel('run.error', err.message ?? String(err));
                     vscode.window.showErrorMessage(`WaterCodeFlow run failed: ${err.message}`);

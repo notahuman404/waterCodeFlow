@@ -143,6 +143,9 @@ function enrichRecording(rec: any, extPath: string): any {
     const varMap: Record<string, any[]> = {};
     const allMutations: any[] = []; // for global scrollbar
 
+    // Cache for file contents to avoid re-reading
+    const fileCache: Record<string, string[]> = {};
+
     try {
         const files = fs.readdirSync(watcherDir).filter(f => f.endsWith('.jsonl'));
         for (const file of files) {
@@ -153,14 +156,28 @@ function enrichRecording(rec: any, extPath: string): any {
                     const evt = JSON.parse(line);
                     const name = evt.variable || evt.name;
                     if (name) {
+                        const lineNo = evt.line_no || evt.lineno || 0;
+                        const filePath = evt.file || '';
+
+                        let codeLine = '';
+                        if (filePath && fs.existsSync(filePath)) {
+                            if (!fileCache[filePath]) {
+                                fileCache[filePath] = fs.readFileSync(filePath, 'utf8').split('\n');
+                            }
+                            if (lineNo > 0 && lineNo <= fileCache[filePath].length) {
+                                codeLine = fileCache[filePath][lineNo - 1].trim();
+                            }
+                        }
+
                         const mutation = {
                             name,
                             value: evt.value ?? evt.new_value ?? null,
                             scope: evt.scope || 'global',
                             type:  evt.type || typeof evt.value,
-                            line_no: evt.line_no || evt.lineno || 0,
+                            line_no: lineNo,
+                            code_line: codeLine,
                             ts_ns: evt.ts_ns || 0,
-                            file: evt.file || ''
+                            file: filePath
                         };
                         if (!varMap[name]) varMap[name] = [];
                         varMap[name].push(mutation);

@@ -221,7 +221,9 @@ function renderGlobalScroller(rec) {
 
     // Update top context bar with current mutation info
     const currentMut = rec.all_mutations[globalIdx];
-    document.getElementById('ri-lineno').innerHTML = 'Line: <strong style="color:var(--wcf-teal)">' + currentMut.line_no + '</strong>';
+    document.getElementById('ri-lineno').innerHTML =
+        'Line: <strong style="color:var(--wcf-teal)">' + currentMut.line_no + '</strong>' +
+        (currentMut.code_line ? ' <span style="opacity:0.6;margin-left:10px">' + currentMut.code_line + '</span>' : '');
     document.getElementById('ri-filepath').textContent = currentMut.file || filePath;
   };
 

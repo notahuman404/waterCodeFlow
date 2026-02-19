@@ -7,6 +7,7 @@ const TRACK_STATE_KEY = 'watercodeflow.trackState';
 export class VariablesViewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private _trackState: Record<string, { tracked: boolean; mode: 'single'|'multi'; runs: number }> = {};
+    private _lastVars: any[] = [];
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
@@ -15,6 +16,30 @@ export class VariablesViewProvider implements vscode.WebviewViewProvider {
     ) {
         // Restore persisted track state
         this._trackState = this._context.globalState.get<typeof this._trackState>(TRACK_STATE_KEY, {});
+    }
+
+    public async onRunDone(filePath: string) {
+        let changed = false;
+        for (const name in this._trackState) {
+            const s = this._trackState[name];
+            if (s.tracked) {
+                if (s.mode === 'single') {
+                    s.tracked = false;
+                    changed = true;
+                } else if (s.mode === 'multi') {
+                    s.runs--;
+                    if (s.runs <= 0) {
+                        s.tracked = false;
+                        changed = true;
+                    }
+                }
+            }
+        }
+        if (changed) {
+            await this._context.globalState.update(TRACK_STATE_KEY, this._trackState);
+            await this._updateFilesScope(filePath);
+            this._view?.webview.postMessage({ command: 'setVars', vars: this._lastVars, trackState: this._trackState });
+        }
     }
 
     public resolveWebviewView(
@@ -124,6 +149,10 @@ export class VariablesViewProvider implements vscode.WebviewViewProvider {
         const filePath = editor?.document.fileName || '';
         let vars: any[] = [];
 
+        // Decrement "multi" runs if needed, or clear "single" if just finished a run
+        // For simplicity, we'll listen for run.done in the extension and call a method here
+        // But for now, let's just make sure we identify scopes correctly.
+
         if (filePath) {
             // 1. Try to get variables from tracked recordings (timeline approach)
             try {
@@ -161,6 +190,8 @@ export class VariablesViewProvider implements vscode.WebviewViewProvider {
                 }
             }
         }
+
+        this._lastVars = vars;
 
         // Send real data (or empty list — no mock fallback)
         this._view.webview.postMessage({

@@ -107,20 +107,20 @@ body {
   justify-content: space-between;
   padding: 6px 14px;
   cursor: pointer;
-  gap: 10px;
+  gap: 20px;
 }
 .branch-item:hover { background: #3a3a3a; }
-.branch-name { font-size: 12px; }
+.branch-name { font-size: 12px; flex: 1; }
 .rename-btn {
   background: none;
-  border: 1px solid #555;
-  color: var(--vscode-descriptionForeground);
+  border: none;
+  color: var(--vscode-textLink-foreground);
   font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 3px;
+  padding: 2px 4px;
   cursor: pointer;
+  text-decoration: underline;
 }
-.rename-btn:hover { border-color: var(--wcf-blue); color: var(--wcf-blue); }
+.rename-btn:hover { color: var(--vscode-textLink-activeForeground); }
 .rename-container {
   display: flex;
   align-items: center;

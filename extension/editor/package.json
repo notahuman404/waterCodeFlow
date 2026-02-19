@@ -124,8 +124,23 @@
           "when": "true"
         },
         {
-          "command": "watercodeflow.runFile",
+          "command": "watercodeflow.openInsights",
           "group": "navigation@5",
+          "when": "true"
+        },
+        {
+          "command": "watercodeflow.openInspector",
+          "group": "navigation@6",
+          "when": "true"
+        },
+        {
+          "command": "watercodeflow.openRunInspector",
+          "group": "navigation@7",
+          "when": "true"
+        },
+        {
+          "command": "watercodeflow.runFile",
+          "group": "navigation@8",
           "when": "true"
         }
       ]
