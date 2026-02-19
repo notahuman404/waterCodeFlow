@@ -294,6 +294,20 @@ for py_file in sorted(tests_dir.glob("*.py")):
         content,
     )
 
+    # sys.path.insert(0, str(Path(__file__).parent.parent))
+    content = re.sub(
+        r"sys\.path\.insert\(0,\s*str\(Path\(__file__\)\.parent\.parent\)\)",
+        "sys.path.insert(0, str(Path(__file__).parent.parent.parent))",
+        content,
+    )
+
+    # EXTENSION_ROOT = Path(__file__).parent.parent
+    content = re.sub(
+        r"EXTENSION_ROOT\s*=\s*Path\(__file__\)\.parent\.parent(?!\.parent)",
+        "EXTENSION_ROOT = Path(__file__).parent.parent.parent",
+        content,
+    )
+
     # os.environ['LD_LIBRARY_PATH'] = '/workspaces/WaterCodeFlow/build:' + ...
     content = re.sub(
         r"os\.environ\[[\"']LD_LIBRARY_PATH[\"']\]\s*=\s*[\"']"
@@ -502,6 +516,49 @@ for f in out/extension.js out/GlueBridge.js out/utils.js \
     fi
 done
 print_success "$OK compiled output files verified"
+
+# ============================================================================
+# STEP 7.5: Bundle backend dependencies
+# ============================================================================
+
+print_header "STEP 7.5: BUNDLING BACKEND DEPENDENCIES"
+
+print_step "Copying backend components to editor/..."
+
+# Copy CodeVovle
+if [ -d "$EXTENSION_ROOT/CodeVovle" ]; then
+    # Use -r to copy directory, and -p to preserve permissions
+    cp -rp "$EXTENSION_ROOT/CodeVovle" "$EDITOR_DIR/"
+    print_success "CodeVovle → editor/"
+fi
+
+# Copy watcher (cli, adapters, core)
+mkdir -p "$EDITOR_DIR/watcher"
+cp -rp "$EXTENSION_ROOT/watcher/cli" "$EDITOR_DIR/watcher/"
+cp -rp "$EXTENSION_ROOT/watcher/adapters" "$EDITOR_DIR/watcher/"
+cp -rp "$EXTENSION_ROOT/watcher/core" "$EDITOR_DIR/watcher/"
+print_success "watcher (cli, adapters, core) → editor/watcher/"
+
+# Copy storage_utility
+cp -rp "$EXTENSION_ROOT/storage_utility" "$EDITOR_DIR/"
+print_success "storage_utility → editor/"
+
+# Copy build artifacts (shared libraries)
+mkdir -p "$EDITOR_DIR/watcher/build"
+cp -p "$EXTENSION_ROOT/build"/*.so "$EDITOR_DIR/watcher/build/"
+print_success "build/*.so → editor/watcher/build/"
+
+# Ensure faststorage_c.so is in storage_utility inside editor
+if [ -f "$EXTENSION_ROOT/build/faststorage_c.so" ]; then
+    cp -p "$EXTENSION_ROOT/build/faststorage_c.so" "$EDITOR_DIR/storage_utility/"
+    print_success "faststorage_c.so → editor/storage_utility/"
+fi
+
+# Sync glue just in case
+if [ -d "$EXTENSION_ROOT/glue" ]; then
+    cp -rp "$EXTENSION_ROOT/glue" "$EDITOR_DIR/"
+    print_success "glue → editor/"
+fi
 
 # ============================================================================
 # STEP 8: Package extension
