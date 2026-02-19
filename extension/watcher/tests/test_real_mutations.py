@@ -22,7 +22,7 @@ import os
 from pathlib import Path
 
 # Get the extension root directory (2 levels up from tests/)
-EXTENSION_ROOT = Path(__file__).parent.parent
+EXTENSION_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(EXTENSION_ROOT))
 print("="*70)
 print("TEST 1: REAL MUTATION DETECTION - Allocate & Register Page")

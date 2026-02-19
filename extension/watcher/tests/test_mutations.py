@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 
 # Get the extension root directory (2 levels up from tests/)
-EXTENSION_ROOT = Path(__file__).parent.parent
+EXTENSION_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(EXTENSION_ROOT))
 os.environ['LD_LIBRARY_PATH'] = str(EXTENSION_ROOT / 'build') + ':' + os.environ.get('LD_LIBRARY_PATH', '')
 from watcher.adapters.python import ShadowMemory, WatchProxy, WatcherCore
