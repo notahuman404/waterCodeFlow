@@ -12,11 +12,27 @@ import { RunInspectorPanel } from './panels/RunInspectorPanel';
 
 let bridge: GlueBridge;
 
+/** File extensions that get watcher-based variable recording. */
+const WATCHER_EXTS = new Set(['.py', '.js', '.mjs']);
+
+/** File extensions that get plain-terminal execution (no variable tracking). */
+const PLAIN_EXTS: Record<string, (f: string) => string> = {
+    '.c':    f => { const o = f.replace(/\.[^/.]+$/, ''); return `gcc -O1 -o "${o}" "${f}" && "${o}"`; },
+    '.cpp':  f => { const o = f.replace(/\.[^/.]+$/, ''); return `g++ -O1 -o "${o}" "${f}" && "${o}"`; },
+    '.cc':   f => { const o = f.replace(/\.[^/.]+$/, ''); return `g++ -O1 -o "${o}" "${f}" && "${o}"`; },
+    '.cxx':  f => { const o = f.replace(/\.[^/.]+$/, ''); return `g++ -O1 -o "${o}" "${f}" && "${o}"`; },
+    '.go':   f => `go run "${f}"`,
+    '.rb':   f => `ruby "${f}"`,
+    '.sh':   f => `bash "${f}"`,
+    '.java': f => { const d = path.dirname(f); const b = path.basename(f, '.java'); return `cd "${d}" && javac "${b}.java" && java "${b}"`; },
+    '.rs':   f => { const o = f.replace(/\.[^/.]+$/, ''); return `rustc -o "${o}" "${f}" && "${o}"`; },
+};
+
 export function activate(context: vscode.ExtensionContext) {
     const extPath = context.extensionPath;
     bridge = new GlueBridge(extPath);
 
-    const variablesProvider = new VariablesViewProvider(context.extensionUri, bridge);
+    const variablesProvider = new VariablesViewProvider(context.extensionUri, bridge, context);
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider('watercodeflow.variables', variablesProvider)
     );
@@ -31,7 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
             SettingsPanel.createOrShow(context.extensionUri, bridge)),
 
         vscode.commands.registerCommand('watercodeflow.openFileSelector', () =>
-            FileSelectorPanel.createOrShow(context.extensionUri, bridge)),
+            FileSelectorPanel.createOrShow(context.extensionUri, bridge, context)),
 
         vscode.commands.registerCommand('watercodeflow.openRecordings', () =>
             RecordingsPanel.createOrShow(context.extensionUri, bridge)),
@@ -48,7 +64,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('watercodeflow.openVariables', () =>
             vscode.commands.executeCommand('watercodeflow.variables.focus')),
 
-        vscode.commands.registerCommand('watercodeflow.runFile', () => {
+        vscode.commands.registerCommand('watercodeflow.runFile', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
                 vscode.window.showWarningMessage('WaterCodeFlow: No active file to run.');
@@ -56,37 +72,47 @@ export function activate(context: vscode.ExtensionContext) {
             }
             const filePath = editor.document.fileName;
             const ext = path.extname(filePath).toLowerCase();
-            const terminal = vscode.window.createTerminal('WaterCodeFlow: Run');
-            terminal.show();
 
-            // Python and JS: use watcher CLI for variable tracking
-            if (ext === '.py') {
-                terminal.sendText(
-                    `cd "${extPath}" && PYTHONPATH="${extPath}:${extPath}/CodeVovle" python3 -m codevovle run "${filePath}" 2>/dev/null || python3 "${filePath}"`
-                );
-            } else if (['.js', '.mjs', '.ts'].includes(ext)) {
-                // JS: use the watcher JS adapter if available, else node
-                const watcherAdapterPath = path.join(extPath, 'watcher', 'adapters', 'javascript', 'index.js');
-                terminal.sendText(`node "${watcherAdapterPath}" "${filePath}" 2>/dev/null || node "${filePath}"`);
-            } else if (['.c', '.cpp', '.cc', '.cxx'].includes(ext)) {
-                const compiler = ext === '.c' ? 'gcc' : 'g++';
-                const outFile = filePath.replace(/\.[^/.]+$/, '');
-                terminal.sendText(`${compiler} -O1 -o "${outFile}" "${filePath}" && "${outFile}"`);
-            } else if (ext === '.go') {
-                terminal.sendText(`go run "${filePath}"`);
-            } else if (ext === '.rb') {
-                terminal.sendText(`ruby "${filePath}"`);
-            } else if (ext === '.sh') {
-                terminal.sendText(`bash "${filePath}"`);
-            } else if (ext === '.java') {
-                const dir = path.dirname(filePath);
-                const base = path.basename(filePath, '.java');
-                terminal.sendText(`cd "${dir}" && javac "${base}.java" && java "${base}"`);
-            } else if (ext === '.rs') {
-                const outFile = filePath.replace(/\.[^/.]+$/, '');
-                terminal.sendText(`rustc -o "${outFile}" "${filePath}" && "${outFile}"`);
+            if (WATCHER_EXTS.has(ext)) {
+                // ── Watcher-tracked run — goes through GlueBridge ──────────────
+                // Spawn watcher CLI via glue so stdout/stderr stream to the
+                // webview and a recording JSON is saved automatically.
+                // Open RecordingsPanel if not already open so user sees live output
+                if (!RecordingsPanel.currentPanel) {
+                    RecordingsPanel.createOrShow(context.extensionUri, bridge);
+                }
+                const panel = RecordingsPanel.currentPanel;
+
+                const notifyPanel = (type: string, data: string) => {
+                    panel?.postRunEvent(type, data);
+                };
+
+                notifyPanel('run.start', filePath);
+
+                try {
+                    const result = await bridge.spawnRun({
+                        filePath,
+                        extPath,
+                        language: ext === '.py' ? 'python' : 'javascript',
+                        onStdout: chunk => notifyPanel('run.stdout', chunk),
+                        onStderr: chunk => notifyPanel('run.stderr', chunk),
+                    });
+                    notifyPanel('run.done', JSON.stringify(result));
+                } catch (err: any) {
+                    notifyPanel('run.error', err.message ?? String(err));
+                    vscode.window.showErrorMessage(`WaterCodeFlow run failed: ${err.message}`);
+                }
+
+            } else if (PLAIN_EXTS[ext]) {
+                // ── Plain terminal execution — no variable tracking ─────────────
+                const terminal = vscode.window.createTerminal('WaterCodeFlow: Run');
+                terminal.show();
+                terminal.sendText(PLAIN_EXTS[ext](filePath));
+
             } else {
-                terminal.sendText(`"${filePath}"`);
+                vscode.window.showWarningMessage(
+                    `WaterCodeFlow: No runner configured for ${ext} files.`
+                );
             }
         })
     );

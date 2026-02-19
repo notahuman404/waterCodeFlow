@@ -1,0 +1,12 @@
+{
+  "runId": "test-1771316877318",
+  "filePath": "/tmp/wcf-test-script.py",
+  "language": "python",
+  "exitCode": 0,
+  "recordingPath": "/home/claude/watercodeflow/editor/built/recordings/test-1771316877318.json",
+  "timestamp": "2026-02-17T08:27:57.318Z",
+  "durationMs": 46,
+  "useWatcher": true,
+  "stdout": "hello\n",
+  "stderr": ""
+}

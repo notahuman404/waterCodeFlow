@@ -26,12 +26,15 @@ class DaemonError(Exception):
 class DaemonManager:
     """Manages background recording daemons."""
     
-    DAEMON_DIR = Path.cwd() / ".codevovle" / "daemons"
-    
+    @classmethod
+    def _daemon_dir(cls) -> Path:
+        """Return the daemon metadata directory (computed dynamically from CWD)."""
+        return Path.cwd() / ".codevovle" / "daemons"
+
     @classmethod
     def _ensure_daemon_dir(cls):
         """Ensure daemon directory exists."""
-        cls.DAEMON_DIR.mkdir(parents=True, exist_ok=True)
+        cls._daemon_dir().mkdir(parents=True, exist_ok=True)
     
     @classmethod
     def _get_daemon_file(cls, file_path: str) -> Path:
@@ -40,7 +43,7 @@ class DaemonManager:
         normalized = Path(file_path).resolve()
         # Create a safe filename from the file path
         safe_name = str(normalized).replace("/", "_").replace(":", "_")
-        return cls.DAEMON_DIR / f"{safe_name}.daemon"
+        return cls._daemon_dir() / f"{safe_name}.daemon"
     
     @classmethod
     def start(cls, file_path: str, interval: float, num_threads: int = None) -> int:
@@ -78,11 +81,21 @@ class DaemonManager:
                 pass
         
         try:
+            # Capture the current working directory (= extension root, set by GlueBridge).
+            # The daemon subprocess must run from the same directory so that its
+            # .codevovle/ data lands in the same place the glue adapter reads from.
+            # We also pass CODEVOVLE_SKIP_CWD_CHECK so validate_cwd() doesn't reject
+            # the directory name (the adapter's cwd is the extension root, not 'CodeVovle').
+            extension_root = os.getcwd()
+            daemon_env = {**os.environ, "CODEVOVLE_SKIP_CWD_CHECK": "1"}
+
             # Start recording process in background
             process = subprocess.Popen(
                 [sys.executable, "-m", "codevovle", "record", "--file", file_path, "--interval", str(interval), "--daemonized"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                cwd=extension_root,
+                env=daemon_env,
                 start_new_session=True  # Create new process group for clean termination
             )
             
@@ -195,7 +208,7 @@ class DaemonManager:
         cls._ensure_daemon_dir()
         daemons = []
         
-        for daemon_file in cls.DAEMON_DIR.glob("*.daemon"):
+        for daemon_file in cls._daemon_dir().glob("*.daemon"):
             try:
                 with open(daemon_file) as f:
                     daemon_data = json.load(f)

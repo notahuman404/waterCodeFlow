@@ -285,24 +285,27 @@ for py_file in sorted(tests_dir.glob("*.py")):
     content = py_file.read_text(encoding="utf-8")
     original = content
 
+    HARDCODED = "/workspaces/WaterCodeFlow"
+
     # sys.path.insert(0, '/workspaces/WaterCodeFlow')
     content = re.sub(
-        r"sys\.path\.insert\(0,\s*['\"]\/workspaces\/WaterCodeFlow['\"]\)",
+        r"sys\.path\.insert\(0,\s*[\"']" + re.escape(HARDCODED) + r"[\"']\)",
         "sys.path.insert(0, str(Path(__file__).parent.parent.parent))",
         content,
     )
 
     # os.environ['LD_LIBRARY_PATH'] = '/workspaces/WaterCodeFlow/build:' + ...
     content = re.sub(
-        r"os\.environ\[(['\"])LD_LIBRARY_PATH\1\]\s*=\s*['\"]\/workspaces\/WaterCodeFlow\/build:['\"]"
-        r"\s*\+\s*os\.environ\.get\(['\"]LD_LIBRARY_PATH['\"],\s*['\"]['\]\)",
+        r"os\.environ\[[\"']LD_LIBRARY_PATH[\"']\]\s*=\s*[\"']"
+        + re.escape(HARDCODED)
+        + r"/build:[\"']\s*\+\s*os\.environ\.get\([\"']LD_LIBRARY_PATH[\"'],\s*[\"'][\"']\)",
         "os.environ['LD_LIBRARY_PATH'] = str(Path(__file__).parent.parent.parent / 'build') + ':' + os.environ.get('LD_LIBRARY_PATH', '')",
         content,
     )
 
     # lib_path = Path('/workspaces/WaterCodeFlow/build/libwatcher_python.so')
     content = re.sub(
-        r"lib_path\s*=\s*Path\(['\"]\/workspaces\/WaterCodeFlow\/build\/libwatcher_python\.so['\"]\)",
+        r"lib_path\s*=\s*Path\([\"']" + re.escape(HARDCODED) + r"/build/libwatcher_python\.so[\"']\)",
         "lib_path = Path(__file__).parent.parent.parent / 'build' / 'libwatcher_python.so'",
         content,
     )
@@ -526,7 +529,9 @@ print_step "Packaging as .vsix..."
 if vsce package \
     --allow-missing-repository \
     --no-dependencies \
-    --allow-package-env-file --allow-star-activation \
+    --allow-star-activation \
+    --allow-missing-repository \
+    --allow-package-env-file \
     >> "$LOG_FILE" 2>&1; then
     print_success "Extension packaged"
 else

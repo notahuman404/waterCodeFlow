@@ -33,12 +33,13 @@ class WatcherFFI:
                 return cls._lib
             
             if lib_path is None:
-                # Auto-detect library path
-                # From watcher/adapters/python/__init__.py, go up 4 levels to workspace root
-                workspace_root = Path(__file__).parent.parent.parent.parent
-                lib_dir = workspace_root / "build"
+                # Auto-detect library path.
+                # __file__ is watcher/adapters/python/__init__.py
+                # Go up 3 levels to reach the watcher/ root directory.
+                watcher_root = Path(__file__).parent.parent.parent
+                lib_dir = watcher_root / "build"
                 if not lib_dir.exists():
-                    lib_dir = workspace_root / "cmake-build-debug"
+                    lib_dir = watcher_root / "cmake-build-debug"
                 lib_path = lib_dir / "libwatcher_python.so"
             
             cls._lib = ctypes.CDLL(str(lib_path))

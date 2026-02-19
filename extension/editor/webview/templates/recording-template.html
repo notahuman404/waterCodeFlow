@@ -1,0 +1,113 @@
+<!--
+  recording-template.html
+  ────────────────────────
+  Reusable recording card template. Populate via JS:
+
+    const card = document.importNode(
+      document.getElementById('recording-card-template').content, true
+    );
+    card.querySelector('[data-field="title"]').textContent = rec.filePath;
+    card.querySelector('[data-field="timestamp"]').textContent = rec.timestamp;
+    // ... set data-vars-json on the card root then call initCard(cardEl, rec)
+
+  Or set data attributes and call initRecordingCard(container, recordingObject).
+  See recordings.js for the live implementation.
+-->
+<template id="recording-card-template">
+  <article class="rec-card"
+           role="region"
+           data-run-id=""
+           data-vars-json="[]"
+           data-expanded="false"
+           aria-label="Recording">
+
+    <!-- ── Header (always visible, clickable to expand) ── -->
+    <div class="rec-card-header"
+         role="button"
+         tabindex="0"
+         aria-expanded="false"
+         aria-controls="rec-detail-{id}">
+
+      <span class="rec-chevron" aria-hidden="true">▶</span>
+
+      <span class="rec-card-title" data-field="title">unknown.py</span>
+
+      <span class="rec-card-meta" data-field="meta">python · 0ms</span>
+
+      <span class="rec-status-badge badge-ok"
+            data-field="badge"
+            aria-label="Exit status">✓</span>
+
+      <!-- Action buttons — stopPropagation so they don't toggle expand -->
+      <div class="rec-card-actions" role="group" aria-label="Recording actions">
+        <button class="rec-action-btn"
+                data-action="play"
+                aria-label="Play replay of variable changes"
+                title="Replay variable value changes">▶ Play</button>
+
+        <button class="rec-action-btn"
+                data-action="export"
+                aria-label="Export recording as JSON"
+                title="Export recording as JSON">⬆ Export</button>
+
+        <button class="rec-action-btn rec-action-delete"
+                data-action="delete"
+                aria-label="Delete recording"
+                title="Delete this recording">✕</button>
+      </div>
+    </div>
+
+    <!-- ── Detail panel (hidden until expanded) ── -->
+    <div class="rec-detail"
+         id="rec-detail-{id}"
+         aria-hidden="true"
+         hidden>
+
+      <!-- Variable table — populated dynamically from data-vars-json -->
+      <div class="rec-detail-section-title" aria-label="Captured variables">Captured variables</div>
+      <table class="rec-var-table" aria-label="Variable values">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Value</th>
+            <th scope="col">Evolutions</th>
+          </tr>
+        </thead>
+        <tbody data-field="var-rows">
+          <!-- Rows injected by JS -->
+        </tbody>
+      </table>
+
+      <!-- Stdout / output preview -->
+      <div class="rec-detail-section-title" data-show-if="stdout" aria-label="Program output">Output</div>
+      <pre class="rec-detail-pre" data-field="stdout" aria-label="Program output"></pre>
+
+      <!-- Replay progress bar -->
+      <div class="rec-replay-bar" hidden aria-label="Replay progress">
+        <span class="rec-replay-label" aria-live="polite">Replaying…</span>
+        <div class="rec-replay-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="rec-replay-fill"></div>
+        </div>
+      </div>
+
+    </div><!-- .rec-detail -->
+  </article><!-- .rec-card -->
+</template>
+
+<!--
+  CSS tokens used by this template
+  (already defined in recordings.css, listed here as reference):
+
+  --wcf-teal        #4ec9b0   primary accent
+  --wcf-orange      #f5a623   animating value highlight
+  --wcf-red         #f44747   error / delete hover
+  --wcf-green       #4caf50   success badge
+  --wcf-card-bg               card background
+  --wcf-card-border           card / table borders
+  --wcf-radius      5px       border radius
+
+  Data attributes populated by recordings.js:
+    data-run-id        unique run identifier
+    data-vars-json     JSON array of {name,value,evolutions}
+    data-expanded      "true" | "false"
+-->

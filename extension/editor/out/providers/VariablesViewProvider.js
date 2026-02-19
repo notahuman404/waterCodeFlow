@@ -36,11 +36,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.VariablesViewProvider = void 0;
 const vscode = __importStar(require("vscode"));
 const utils_1 = require("../utils");
+const TRACK_STATE_KEY = 'watercodeflow.trackState';
 class VariablesViewProvider {
-    constructor(_extensionUri, _bridge) {
+    constructor(_extensionUri, _bridge, _context) {
         this._extensionUri = _extensionUri;
         this._bridge = _bridge;
+        this._context = _context;
         this._trackState = {};
+        // Restore persisted track state
+        this._trackState = this._context.globalState.get(TRACK_STATE_KEY, {});
     }
     resolveWebviewView(webviewView, _context, _token) {
         this._view = webviewView;
@@ -55,10 +59,15 @@ class VariablesViewProvider {
                     await this._pushVars();
                     break;
                 case 'toggleTrack': {
+                    // IMPORTANT: Variable tracking is UI-ONLY.
+                    // Variables come from RUN RECORDINGS (watcher mutations), not daemon.
+                    // This toggle just marks which variables the user wants to see.
                     const { name } = msg;
                     const s = this._trackState[name] || { tracked: false, mode: 'multi', runs: 5 };
                     s.tracked = !s.tracked;
                     this._trackState[name] = s;
+                    // Persist trackState for next session
+                    await this._context.globalState.update(TRACK_STATE_KEY, this._trackState);
                     webviewView.webview.postMessage({ command: 'trackState', name, state: s });
                     break;
                 }
@@ -66,49 +75,73 @@ class VariablesViewProvider {
                     const { name, mode, runs } = msg;
                     const s = this._trackState[name] || { tracked: true, mode: 'multi', runs: 5 };
                     s.mode = mode;
-                    if (runs !== undefined)
+                    if (runs !== undefined) {
                         s.runs = runs;
+                    }
                     this._trackState[name] = s;
+                    await this._context.globalState.update(TRACK_STATE_KEY, this._trackState);
                     break;
                 }
                 case 'refresh':
                     await this._pushVars();
                     break;
             }
+        }, null, []);
+        // Refresh when active editor changes — tracked so it's disposed with the view
+        this._context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => this._pushVars()));
+        // Also refresh when the sidebar panel becomes visible after being hidden
+        webviewView.onDidChangeVisibility(() => {
+            if (webviewView.visible) {
+                this._pushVars();
+            }
         });
-        // Refresh when active editor changes
-        vscode.window.onDidChangeActiveTextEditor(() => this._pushVars());
     }
     async _pushVars() {
-        if (!this._view)
+        if (!this._view) {
             return;
+        }
         const editor = vscode.window.activeTextEditor;
         const filePath = editor?.document.fileName || '';
         let vars = [];
         if (filePath) {
+            // 1. Try to get variables from tracked recordings (timeline approach)
             try {
                 const inferred = await this._bridge.send('getVariableTimeline', {
                     filePath,
                     variableName: '_all_vars_',
                     maxTicks: 1
                 });
-                // inferred may be empty — fall through to infer_from_file
+                if (Array.isArray(inferred) && inferred.length > 0) {
+                    vars = inferred.map((v) => ({
+                        name: typeof v === 'string' ? v : (v.name || String(v)),
+                        file: filePath,
+                        scope: (typeof v === 'object' && v.scope) ? v.scope : 'global',
+                        line_no: v.line_no || 0
+                    }));
+                }
             }
-            catch (_) { }
-            // Use Python-side infer_variables_from_file via a separate call
-            try {
-                // We call listTrackedVariables which gives us config-tracked vars
-                const tracked = await this._bridge.send('listTrackedVariables', { filePath });
-                vars = tracked.map((v) => ({
-                    name: typeof v === 'string' ? v : v.name,
-                    file: filePath,
-                    scope: (typeof v === 'object' && v.scope) ? v.scope : 'global',
-                    line_no: v.line_no || 0
-                }));
+            catch (e) {
+                console.warn('getVariableTimeline failed:', e);
             }
-            catch (_) { }
+            // 2. If no timeline data, try listTrackedVariables
+            if (vars.length === 0) {
+                try {
+                    const tracked = await this._bridge.send('listTrackedVariables', { filePath });
+                    if (Array.isArray(tracked) && tracked.length > 0) {
+                        vars = tracked.map((v) => ({
+                            name: typeof v === 'string' ? v : v.name,
+                            file: filePath,
+                            scope: (typeof v === 'object' && v.scope) ? v.scope : 'global',
+                            line_no: v.line_no || 0
+                        }));
+                    }
+                }
+                catch (e) {
+                    console.warn('listTrackedVariables failed:', e);
+                }
+            }
         }
-        // Always send something — if no real data, show placeholder sections
+        // Send real data (or empty list — no mock fallback)
         this._view.webview.postMessage({
             command: 'setVars',
             filePath,

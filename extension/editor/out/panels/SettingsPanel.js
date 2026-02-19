@@ -46,28 +46,7 @@ class SettingsPanel {
         const panel = vscode.window.createWebviewPanel('watercodeflow.settings', 'Watcher Settings', column, { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')] });
         SettingsPanel.currentPanel = new SettingsPanel(panel, extensionUri, bridge);
     }
-    constructor(panel, extensionUri, bridge) {
-        this.bridge = bridge;
-        this._disposables = [];
-        this._panel = panel;
-        this._panel.webview.html = this._getHtml(panel.webview, extensionUri);
-        this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-        this._panel.webview.onDidReceiveMessage(async (msg) => {
-            if (msg.command === 'saveSettings') {
-                // Persist settings via extension configuration
-                const cfg = vscode.workspace.getConfiguration('watercodeflow');
-                await cfg.update('trackThreads', msg.trackThreads, vscode.ConfigurationTarget.Global);
-                await cfg.update('trackLocals', msg.trackLocals, vscode.ConfigurationTarget.Global);
-                await cfg.update('trackSql', msg.trackSql, vscode.ConfigurationTarget.Global);
-                await cfg.update('trackAll', msg.trackAll, vscode.ConfigurationTarget.Global);
-                await cfg.update('samplingInterval', msg.samplingInterval, vscode.ConfigurationTarget.Global);
-                await cfg.update('daemonThreads', msg.daemonThreads, vscode.ConfigurationTarget.Global);
-                await cfg.update('aiModel', msg.aiModel, vscode.ConfigurationTarget.Global);
-                await cfg.update('logLevel', msg.logLevel, vscode.ConfigurationTarget.Global);
-                vscode.window.showInformationMessage('WaterCodeFlow: Settings saved.');
-            }
-        });
-        // Push saved settings to webview
+    _pushSettings() {
         const cfg = vscode.workspace.getConfiguration('watercodeflow');
         this._panel.webview.postMessage({
             command: 'loadSettings',
@@ -79,15 +58,76 @@ class SettingsPanel {
                 samplingInterval: cfg.get('samplingInterval', 0.5),
                 daemonThreads: cfg.get('daemonThreads', 4),
                 aiModel: cfg.get('aiModel', 'Gemini'),
-                logLevel: cfg.get('logLevel', 'INFO')
+                logLevel: cfg.get('logLevel', 'INFO'),
+                mutationDepth: cfg.get('mutationDepth', 'Custom & Full'),
+                filesScope: cfg.get('filesScope', ''),
+                maxQueueSize: cfg.get('maxQueueSize', 1000),
+                customProcessor: cfg.get('customProcessor', ''),
+            }
+        });
+    }
+    constructor(panel, extensionUri, bridge) {
+        this.bridge = bridge;
+        this._disposables = [];
+        this._panel = panel;
+        this._panel.webview.html = this._getHtml(panel.webview, extensionUri);
+        this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+        this._panel.webview.onDidReceiveMessage(async (msg) => {
+            if (msg.command === 'ready') {
+                // Webview is fully loaded — safe to push stored settings now
+                this._pushSettings();
+            }
+            else if (msg.command === 'saveSettings') {
+                const cfg = vscode.workspace.getConfiguration('watercodeflow');
+                await cfg.update('trackThreads', msg.trackThreads, vscode.ConfigurationTarget.Global);
+                await cfg.update('trackLocals', msg.trackLocals, vscode.ConfigurationTarget.Global);
+                await cfg.update('trackSql', msg.trackSql, vscode.ConfigurationTarget.Global);
+                await cfg.update('trackAll', msg.trackAll, vscode.ConfigurationTarget.Global);
+                await cfg.update('samplingInterval', msg.samplingInterval, vscode.ConfigurationTarget.Global);
+                await cfg.update('daemonThreads', msg.daemonThreads, vscode.ConfigurationTarget.Global);
+                await cfg.update('aiModel', msg.aiModel, vscode.ConfigurationTarget.Global);
+                await cfg.update('logLevel', msg.logLevel, vscode.ConfigurationTarget.Global);
+                await cfg.update('mutationDepth', msg.mutationDepth, vscode.ConfigurationTarget.Global);
+                await cfg.update('filesScope', msg.filesScope, vscode.ConfigurationTarget.Global);
+                await cfg.update('maxQueueSize', msg.maxQueueSize, vscode.ConfigurationTarget.Global);
+                await cfg.update('customProcessor', msg.customProcessor, vscode.ConfigurationTarget.Global);
+                vscode.window.showInformationMessage('WaterCodeFlow: Settings saved.');
+                // Confirm saved values back to webview
+                this._pushSettings();
+            }
+            else if (msg.command === 'browseProcessor') {
+                const uris = await vscode.window.showOpenDialog({
+                    canSelectFiles: true, canSelectFolders: false, canSelectMany: false,
+                    openLabel: 'Select Processor Script',
+                    filters: { 'Python / Scripts': ['py', 'sh', 'js'] }
+                });
+                if (uris && uris.length > 0) {
+                    this._panel.webview.postMessage({ command: 'setProcessor', path: uris[0].fsPath });
+                }
+            }
+            else if (msg.command === 'resetRecording') {
+                const fp = vscode.window.activeTextEditor?.document.fileName || '';
+                if (fp) {
+                    try {
+                        await bridge.send('deleteAllRecordings', { filePath: fp });
+                        vscode.window.showInformationMessage('WaterCodeFlow: All recordings for this file have been reset.');
+                    }
+                    catch (e) {
+                        vscode.window.showErrorMessage('Reset failed: ' + e.message);
+                    }
+                }
+                else {
+                    vscode.window.showWarningMessage('WaterCodeFlow: Open a file to reset its recordings.');
+                }
             }
         });
     }
     dispose() {
         SettingsPanel.currentPanel = undefined;
         this._panel.dispose();
-        while (this._disposables.length)
+        while (this._disposables.length) {
             this._disposables.pop()?.dispose();
+        }
     }
     _getHtml(webview, extensionUri) {
         const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'settings.js'));
@@ -111,12 +151,12 @@ class SettingsPanel {
       <div class="toggle-row"><span class="toggle-label">Track SQL</span><label class="toggle"><input type="checkbox" id="trackSql" checked><span class="slider"></span></label></div>
       <div class="toggle-row"><span class="toggle-label">Track All</span><label class="toggle"><input type="checkbox" id="trackAll" checked><span class="slider"></span></label></div>
       <div class="control-row"><label class="control-label">Mutation Depth</label><select class="control-input" id="mutationDepth"><option>Custom &amp; Full</option><option>Custom</option><option>Full</option><option>Shallow</option></select></div>
-      <div class="control-row"><label class="control-label">Files Scope</label><input type="text" class="control-input" id="filesScope" value="List of Files" /></div>
+      <div class="control-row"><label class="control-label">Files Scope</label><input type="text" class="control-input" id="filesScope" placeholder="List of files (comma-separated)" /></div>
       <div class="control-row"><label class="control-label">Max Queue Size</label><input type="number" class="control-input" id="maxQueueSize" value="1000" min="1" /></div>
       <div class="control-row"><label class="control-label">Log Level</label><select class="control-input" id="logLevel"><option>INFO</option><option>DEBUG</option></select></div>
       <div class="control-row"><label class="control-label">Custom Processor</label><div class="input-with-btn"><input type="text" class="control-input flex1" id="customProcessor" placeholder="Attach..." /><button class="folder-btn" id="browseBtn">&#128193;</button></div></div>
     </div>
-    <h2 class="section-header">Code Volvo (Recording) Settings</h2>
+    <h2 class="section-header">Code Vovle (Recording) Settings</h2>
     <div class="settings-section">
       <div class="control-row"><label class="control-label">Sampling Interval</label><div class="input-hint-row"><input type="number" class="control-input control-input-sm" id="samplingInterval" value="0.5" step="0.1" min="0.01" /><span class="hint-text">hint timing</span><span class="unit-text">s</span></div></div>
       <div class="control-row"><label class="control-label">Daemon Threads</label><input type="number" class="control-input" id="daemonThreads" value="4" min="1" max="32" /></div>

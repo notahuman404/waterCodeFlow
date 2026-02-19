@@ -1,11 +1,48 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { GlueBridge } from '../GlueBridge';
 import { getNonce } from '../utils';
+
+/** Parse watcher JSONL events and merge variables into an existing recording object. */
+function enrichRecordingWithVars(rec: any, extPath: string): any {
+    const runId = rec.runId || rec.run_id;
+    if (!runId || rec.vars) { return rec; }
+    // extPath IS the extension root (no need to go up one level)
+    const projectRoot = extPath;
+    const watcherDir = path.join(projectRoot, 'built', 'watcher_events', runId);
+    if (!fs.existsSync(watcherDir)) { return rec; }
+    const varMap: Record<string, any> = {};
+    try {
+        fs.readdirSync(watcherDir).filter(f => f.endsWith('.jsonl')).forEach(file => {
+            fs.readFileSync(path.join(watcherDir, file), 'utf8')
+                .split('\n').filter(Boolean).forEach(line => {
+                    try {
+                        const evt = JSON.parse(line);
+                        const name = evt.variable || evt.name;
+                        if (name) {
+                            varMap[name] = {
+                                name,
+                                value: evt.value ?? evt.new_value ?? null,
+                                scope: evt.scope || 'global',
+                                type: evt.type || typeof evt.value,
+                                line_no: evt.line_no || evt.lineno || 0,
+                                evolutions: (varMap[name]?.evolutions ?? 0) + 1,
+                            };
+                        }
+                    } catch (_) {}
+                });
+        });
+    } catch (_) {}
+    return Object.keys(varMap).length > 0 ? { ...rec, vars: Object.values(varMap) } : rec;
+}
 
 export class RecordingsPanel {
     public static currentPanel: RecordingsPanel | undefined;
     private readonly _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
+    private _extensionUri: vscode.Uri;
+    private _lastPushedFilePath: string = '';
 
     public static createOrShow(extensionUri: vscode.Uri, bridge: GlueBridge) {
         const column = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
@@ -20,22 +57,35 @@ export class RecordingsPanel {
         RecordingsPanel.currentPanel = new RecordingsPanel(panel, extensionUri, bridge);
     }
 
+    /** Forward a run lifecycle event (stdout, stderr, done, error) into the webview. */
+    public postRunEvent(type: string, data: string) {
+        // Make sure the panel is visible so the user can see live output
+        if (!this._panel.visible) {
+            this._panel.reveal(vscode.ViewColumn.Beside, true);
+        }
+        this._panel.webview.postMessage({ command: 'run.event', type, data });
+    }
+
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, private bridge: GlueBridge) {
         this._panel = panel;
+        this._extensionUri = extensionUri;
         this._panel.webview.html = this._getHtml(panel.webview, extensionUri);
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
-        this._panel.webview.onDidReceiveMessage(async (msg) => {
+        this._panel.webview.onDidReceiveMessage(async (msg: any) => {
             switch (msg.command) {
                 case 'ready':
                     await this._pushData();
                     break;
+
                 case 'openRunInspector':
                     vscode.commands.executeCommand('watercodeflow.openRunInspector');
                     break;
+
                 case 'openVariableInspector':
                     vscode.commands.executeCommand('watercodeflow.openInspector');
                     break;
+
                 case 'deleteRun': {
                     const fp = vscode.window.activeTextEditor?.document.fileName || '';
                     if (fp) {
@@ -48,67 +98,143 @@ export class RecordingsPanel {
                     }
                     break;
                 }
+
+                case 'deleteRecording': {
+                    const extPath = this._extensionUri.fsPath;
+                    // extPath IS the extension root (no need to go up one level)
+                    const projectRoot = extPath;
+                    const recordingsDir = path.join(projectRoot, 'built', 'recordings');
+                    try {
+                        if (fs.existsSync(recordingsDir)) {
+                            const files = fs.readdirSync(recordingsDir);
+                            const match = files.find(f => f.startsWith(msg.runId) || f === `${msg.runId}.json`);
+                            if (match) {
+                                fs.unlinkSync(path.join(recordingsDir, match));
+                            }
+                        }
+                    } catch (_) {}
+                    // Also tell glue to remove it (non-fatal)
+                    this.bridge.send('deleteRecording', { runId: msg.runId }).catch((e: any) => {
+                        console.warn('deleteRecording glue call failed:', e.message);
+                        // Non-fatal: disk deletion already happened
+                    });
+                    this._panel.webview.postMessage({ command: 'recordingDeleted', runId: msg.runId });
+                    await this._pushData();
+                    break;
+                }
+
+                case 'exportRecording': {
+                    const rec = msg.recording;
+                    if (!rec) { break; }
+                    const uri = await vscode.window.showSaveDialog({
+                        defaultUri: vscode.Uri.file(`recording-${rec.runId || 'export'}.json`),
+                        filters: { 'JSON': ['json'] }
+                    });
+                    if (uri) {
+                        fs.writeFileSync(uri.fsPath, JSON.stringify(rec, null, 2));
+                        vscode.window.showInformationMessage(`Recording exported to ${uri.fsPath}`);
+                    }
+                    break;
+                }
             }
         });
     }
 
     private async _pushData() {
         const fp = vscode.window.activeTextEditor?.document.fileName || '';
-        let trackedFiles: any[] = [];
-        let vars: any[] = [];
-        let runs: any[] = [];
+        const extPath = this._extensionUri.fsPath;
+        // extPath IS the extension root — no need to go up one level
+        const projectRoot = extPath;
 
+        // ── 1. spawnRun recordings from built/recordings/*.json ──────────────
+        let recordings: any[] = [];
+        const recordingsDir = path.join(projectRoot, 'built', 'recordings');
+        try {
+            if (fs.existsSync(recordingsDir)) {
+                const files = fs.readdirSync(recordingsDir)
+                    .filter(f => f.endsWith('.json'))
+                    .sort()
+                    .reverse(); // newest first
+                recordings = files.map(f => {
+                    try {
+                        const rec = JSON.parse(fs.readFileSync(path.join(recordingsDir, f), 'utf8'));
+                        return enrichRecordingWithVars(rec, extPath);
+                    } catch (_) { return null; }
+                }).filter(Boolean);
+            }
+        } catch (_) {}
+
+        // ── 2. Daemon-based runs from .codevovle/ (via glue listRuns) ────────
+        // These are created by the background recording daemon (track file button).
+        // Merge them with spawnRun recordings so both show up in the panel.
         if (fp) {
             try {
-                const recs = await this.bridge.send('listRecordings', { filePath: fp }) as any[];
-                trackedFiles = recs.length > 0 ? [{ name: fp.split('/').pop() || fp, path: fp }] : [];
+                const daemonRuns = await this.bridge.send('listRuns', { filePath: fp }) as any[];
+                if (Array.isArray(daemonRuns) && daemonRuns.length > 0) {
+                    // Avoid duplicating runs already in the JSON recordings list
+                    const existingIds = new Set(recordings.map((r: any) => r.runId || r.run_id));
+                    for (const run of daemonRuns) {
+                        if (!existingIds.has(run.runId) && !existingIds.has(run.run_id)) {
+                            recordings.push(run);
+                        }
+                    }
+                }
             } catch (_) {}
+        }
 
+        // ── 3. Tracked files — derived from all recordings ───────────────────
+        const seen = new Set<string>();
+        const trackedFiles: any[] = [];
+        recordings.forEach(r => {
+            const p = r.filePath || r.file_path || '';
+            if (p && !seen.has(p)) {
+                seen.add(p);
+                trackedFiles.push({ name: path.basename(p), path: p });
+            }
+        });
+
+        // Also include the active file even if it has no recordings yet
+        if (fp && !seen.has(fp)) {
+            try {
+                const recs = await this.bridge.send('listRecordings', { filePath: fp }) as any[];
+                if (recs && recs.length > 0) {
+                    trackedFiles.unshift({ name: path.basename(fp), path: fp });
+                }
+            } catch (_) {}
+        }
+
+        // ── 4. Variable evolutions from glue ─────────────────────────────────
+        let vars: any[] = [];
+        if (fp) {
             try {
                 vars = await this.bridge.send('listTrackedVariables', { filePath: fp }) as any[];
-            } catch (_) {}
-
-            try {
-                runs = await this.bridge.send('listRuns', { filePath: fp }) as any[];
+                if (!Array.isArray(vars)) { vars = []; }
             } catch (_) {}
         }
 
-        // Fallback demo data if nothing from glue
-        if (trackedFiles.length === 0) {
-            trackedFiles = [
-                { name: 'main.py', path: './src/main.py' },
-                { name: 'utils.py', path: './src/utils.py' },
-                { name: 'data_proc.py', path: './src/data_proc.py' }
-            ];
-        }
-        if (vars.length === 0) {
-            vars = [
-                { name: 'counter', evolutions: 5 },
-                { name: 'total_sum', evolutions: 8 },
-                { name: 'status', evolutions: 3 },
-                { name: 'data_buffer', evolutions: 6 }
-            ];
-        }
-        if (runs.length === 0) {
-            runs = [
-                { run_id: 4, tick_count: 7 },
-                { run_id: 3, tick_count: 3 },
-                { run_id: 2, tick_count: 2 }
-            ];
-        }
+        const resetFilter = this._lastPushedFilePath !== fp;
+        this._lastPushedFilePath = fp;
 
-        this._panel.webview.postMessage({ command: 'setData', trackedFiles, vars, runs });
+        this._panel.webview.postMessage({
+            command: 'setData',
+            trackedFiles,
+            vars,
+            runs: [],
+            recordings,
+            filePath: fp,
+            _resetFilter: resetFilter,
+        });
     }
 
     public dispose() {
         RecordingsPanel.currentPanel = undefined;
         this._panel.dispose();
-        while (this._disposables.length) this._disposables.pop()?.dispose();
+        while (this._disposables.length) { this._disposables.pop()?.dispose(); }
     }
 
     private _getHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
         const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'recordings.js'));
-        const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'recordings.css'));
+        const styleUri  = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'recordings.css'));
         const nonce = getNonce();
         return `<!DOCTYPE html>
 <html lang="en">
@@ -120,7 +246,7 @@ export class RecordingsPanel {
   <link href="${styleUri}" rel="stylesheet">
 </head>
 <body>
-  <div class="recordings-container" id="recordings-container"><div class="loading">Loading...</div></div>
+  <div class="recordings-container" id="recordings-container"><div class="loading">Loading…</div></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

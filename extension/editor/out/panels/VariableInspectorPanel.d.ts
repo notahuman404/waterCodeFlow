@@ -5,6 +5,7 @@ export declare class VariableInspectorPanel {
     static currentPanel: VariableInspectorPanel | undefined;
     private readonly _panel;
     private _disposables;
+    private _extensionUri;
     static createOrShow(extensionUri: vscode.Uri, bridge: GlueBridge): void;
     private constructor();
     private _pushVarData;

@@ -1,0 +1,67 @@
+
+── 1. WATCHER_EXTS coverage ──
+✓  .py is a watcher-tracked extension
+✓  .js is a watcher-tracked extension
+✓  .mjs is a watcher-tracked extension
+✓  .go is NOT in WATCHER_EXTS (plain exec)
+✓  .rs is NOT in WATCHER_EXTS (plain exec)
+
+── 2. Run path: watcher, no codevovle ──
+✓  No '-m codevovle run' in extension.ts
+✓  No '-m codevovle' in GlueBridge.ts
+✓  GlueBridge.spawnRun spawns watcher.cli for Python
+✓  GlueBridge.spawnRun uses --user-script flag
+✓  useWatcher is always true in spawnRun return value
+
+── 3. No ad-hoc child_process in extension host ──
+✓  extension.ts has no direct child_process.spawn / exec
+✓  extension.ts calls bridge.spawnRun() for watcher paths
+
+── 4-5. Recording JSON written by spawnRun() ──
+✓  spawnRun() produces a JSON file in built/recordings/
+✓  Recording JSON contains all required fields
+✓  useWatcher is true in recording JSON
+✓  exitCode 0 recorded for clean run
+
+── 6. stdout/stderr streaming ──
+✓  stdout chunks were captured during run
+✓  stdout contains expected output
+
+── 7. Exit code propagation ──
+✓  non-zero exit code is captured
+
+── 8. No codevovle in run paths ──
+✓  No file contains '-m codevovle run'
+
+── 9. Glue adapter: saveRecording ──
+✓  adapter.py handles saveRecording command
+✓  adapter.py saveRecording round-trip via stdin/stdout
+
+── 10. recordings.js interactive wiring ──
+✓  recordings.js handles run.event messages
+✓  recordings.js handles run.start event
+✓  recordings.js handles run.stdout event
+✓  recordings.js handles run.done event
+✓  recordings.js has expand/collapse toggle
+✓  recordings.js has play replay animation
+✓  recordings.js has delete action
+✓  recordings.js has export action
+✓  recordings.js has ARIA attributes on cards
+✓  CSS has rec-card styles
+✓  CSS has replay-bar styles
+✓  CSS has run-log styles
+
+── 11. recording-template.html ──
+✓  recording-template.html exists
+✓  recording-template.html contains <template> tag
+✓  recording-template.html has ARIA role attributes
+✓  recording-template.html has data-field placeholders
+✓  recording-template.html has data-action buttons
+
+── 12. No literal mockup images in recordings ──
+✓  recordings.js does not embed .png/.jpg filenames
+
+──────────────────────────────────────────────────────
+  Results: 40/40 passed  — all green ✓
+──────────────────────────────────────────────────────
+

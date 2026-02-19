@@ -88,6 +88,38 @@ print("vscode stub written")
 PYEOF
 success "Type stubs ready"
 
+# Step 3.5: Bundle backend dependencies into extension directory
+step "Bundling backend dependencies"
+PARENT_DIR="$(dirname "$EXTENSION_ROOT")"
+
+# Copy CodeVovle (codevovle Python package) if it's not already here
+if [ -d "$PARENT_DIR/CodeVovle" ] && [ ! -d "$EXTENSION_ROOT/CodeVovle" ]; then
+  cp -r "$PARENT_DIR/CodeVovle" "$EXTENSION_ROOT/CodeVovle"
+  success "Copied CodeVovle -> $EXTENSION_ROOT/CodeVovle"
+elif [ -d "$EXTENSION_ROOT/CodeVovle" ]; then
+  success "CodeVovle already present"
+else
+  warn "CodeVovle not found in parent directory — codevovle features will be limited"
+fi
+
+# Copy pre-built watcher .so files if available
+WATCHER_BUILD="$PARENT_DIR/watcher/build"
+if [ -d "$WATCHER_BUILD" ]; then
+  mkdir -p "$EXTENSION_ROOT/watcher/build"
+  cp "$WATCHER_BUILD"/*.so "$EXTENSION_ROOT/watcher/build/" 2>/dev/null || true
+  success "Copied watcher shared libs"
+fi
+
+# Copy watcher CLI and adapters for Python tracking
+WATCHER_SRC="$PARENT_DIR/watcher"
+if [ -d "$WATCHER_SRC" ] && [ ! -d "$EXTENSION_ROOT/watcher/cli" ]; then
+  mkdir -p "$EXTENSION_ROOT/watcher"
+  cp -r "$WATCHER_SRC/cli" "$EXTENSION_ROOT/watcher/cli" 2>/dev/null || true
+  cp -r "$WATCHER_SRC/adapters" "$EXTENSION_ROOT/watcher/adapters" 2>/dev/null || true
+  cp -r "$WATCHER_SRC/core" "$EXTENSION_ROOT/watcher/core" 2>/dev/null || true
+  success "Copied watcher CLI and adapters"
+fi
+
 # Step 4: Compile TypeScript
 step "Compiling TypeScript"
 TSC_BIN=""
@@ -137,9 +169,9 @@ mf = '''<?xml version="1.0" encoding="utf-8"?>
   <Assets><Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true"/></Assets>
 </PackageManifest>'''
 
-INCLUDE_DIRS=['out','media','glue','CodeVovle','storage_utility']
+INCLUDE_DIRS=['out','media','glue','CodeVovle','storage_utility','watcher']
 INCLUDE_FILES=['package.json','tsconfig.json']
-EXCLUDE_DIRS={'node_modules','__pycache__','.git','build','tests','idea_images','editor','.vscode-test','.codevovle','.vscode','watcher'}
+EXCLUDE_DIRS={'node_modules','__pycache__','.git','tests','idea_images','editor','.vscode-test','.codevovle','.vscode'}
 EXCLUDE_EXTS={'.pyc','.o','.bin'}
 
 with zipfile.ZipFile(vsix_path,'w',zipfile.ZIP_DEFLATED) as zf:

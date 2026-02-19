@@ -4,8 +4,12 @@
   "description": "Time-travel debugger for Python",
   "version": "0.2.0",
   "publisher": "watercodeflow",
-  "engines": { "vscode": "^1.89.0" },
-  "activationEvents": ["onStartupFinished"],
+  "engines": {
+    "vscode": "^1.89.0"
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -41,23 +45,155 @@
       ]
     },
     "commands": [
-      { "command": "watercodeflow.openVariables",    "title": "Variables",          "icon": "$(eye)" },
-      { "command": "watercodeflow.openSettings",     "title": "Watcher Settings",   "icon": "$(gear)" },
-      { "command": "watercodeflow.openFileSelector", "title": "Select Files",       "icon": "$(device-camera-video)" },
-      { "command": "watercodeflow.openRecordings",   "title": "Recordings",         "icon": "$(record)" },
-      { "command": "watercodeflow.openInsights",     "title": "Insights",           "icon": "$(graph)" },
-      { "command": "watercodeflow.openInspector",    "title": "Variable Inspector", "icon": "$(search)" },
-      { "command": "watercodeflow.openRunInspector", "title": "Run Inspector",      "icon": "$(list-ordered)" },
-      { "command": "watercodeflow.runFile",          "title": "Run File",           "icon": "$(play)" }
+      {
+        "command": "watercodeflow.openVariables",
+        "title": "Variables",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "watercodeflow.openSettings",
+        "title": "Watcher Settings",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "watercodeflow.openFileSelector",
+        "title": "Select Files",
+        "icon": "$(device-camera-video)"
+      },
+      {
+        "command": "watercodeflow.openRecordings",
+        "title": "Recordings",
+        "icon": "$(record)"
+      },
+      {
+        "command": "watercodeflow.openInsights",
+        "title": "Insights",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "watercodeflow.openInspector",
+        "title": "Variable Inspector",
+        "icon": "$(search)"
+      },
+      {
+        "command": "watercodeflow.openRunInspector",
+        "title": "Run Inspector",
+        "icon": "$(list-ordered)"
+      },
+      {
+        "command": "watercodeflow.runFile",
+        "title": "Run File",
+        "icon": "$(play)"
+      }
     ],
     "menus": {
       "editor/title": [
-        { "command": "watercodeflow.openVariables",    "group": "navigation@1", "when": "true" },
-        { "command": "watercodeflow.openSettings",     "group": "navigation@2", "when": "true" },
-        { "command": "watercodeflow.openFileSelector", "group": "navigation@3", "when": "true" },
-        { "command": "watercodeflow.openRecordings",   "group": "navigation@4", "when": "true" },
-        { "command": "watercodeflow.runFile",          "group": "navigation@5", "when": "true" }
+        {
+          "command": "watercodeflow.openVariables",
+          "group": "navigation@1",
+          "when": "true"
+        },
+        {
+          "command": "watercodeflow.openSettings",
+          "group": "navigation@2",
+          "when": "true"
+        },
+        {
+          "command": "watercodeflow.openFileSelector",
+          "group": "navigation@3",
+          "when": "true"
+        },
+        {
+          "command": "watercodeflow.openRecordings",
+          "group": "navigation@4",
+          "when": "true"
+        },
+        {
+          "command": "watercodeflow.runFile",
+          "group": "navigation@5",
+          "when": "true"
+        }
       ]
+    },
+    "configuration": {
+      "title": "WaterCodeFlow",
+      "properties": {
+        "watercodeflow.trackThreads": {
+          "type": "boolean",
+          "default": true,
+          "description": "Track thread variables"
+        },
+        "watercodeflow.trackLocals": {
+          "type": "boolean",
+          "default": false,
+          "description": "Track local scope variables"
+        },
+        "watercodeflow.trackSql": {
+          "type": "boolean",
+          "default": true,
+          "description": "Track SQL queries"
+        },
+        "watercodeflow.trackAll": {
+          "type": "boolean",
+          "default": true,
+          "description": "Track all variable mutations"
+        },
+        "watercodeflow.samplingInterval": {
+          "type": "number",
+          "default": 0.5,
+          "description": "Sampling interval in seconds"
+        },
+        "watercodeflow.daemonThreads": {
+          "type": "integer",
+          "default": 4,
+          "description": "Number of daemon threads"
+        },
+        "watercodeflow.aiModel": {
+          "type": "string",
+          "default": "Gemini",
+          "enum": [
+            "Gemini",
+            "ChatGPT",
+            "Claude"
+          ],
+          "description": "AI model for insights"
+        },
+        "watercodeflow.logLevel": {
+          "type": "string",
+          "default": "INFO",
+          "enum": [
+            "INFO",
+            "DEBUG"
+          ],
+          "description": "Log verbosity"
+        },
+        "watercodeflow.mutationDepth": {
+          "type": "string",
+          "default": "Custom & Full",
+          "enum": [
+            "Custom & Full",
+            "Custom",
+            "Full",
+            "Shallow"
+          ],
+          "description": "Variable mutation tracking depth"
+        },
+        "watercodeflow.filesScope": {
+          "type": "string",
+          "default": "",
+          "description": "Comma-separated list of files to restrict tracking scope"
+        },
+        "watercodeflow.maxQueueSize": {
+          "type": "integer",
+          "default": 1000,
+          "description": "Maximum event queue size"
+        },
+        "watercodeflow.customProcessor": {
+          "type": "string",
+          "default": "",
+          "description": "Path to custom processor script"
+        }
+      }
     }
   },
   "scripts": {

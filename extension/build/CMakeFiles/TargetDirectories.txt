@@ -1,0 +1,9 @@
+/workspaces/waterCodeFlow/extension/build/CMakeFiles/faststorage_c.dir
+/workspaces/waterCodeFlow/extension/build/CMakeFiles/watcher_core.dir
+/workspaces/waterCodeFlow/extension/build/CMakeFiles/watcher_python.dir
+/workspaces/waterCodeFlow/extension/build/CMakeFiles/watcher_processor.dir
+/workspaces/waterCodeFlow/extension/build/CMakeFiles/watcher_faststorage_c.dir
+/workspaces/waterCodeFlow/extension/build/CMakeFiles/test_core.dir
+/workspaces/waterCodeFlow/extension/build/CMakeFiles/test.dir
+/workspaces/waterCodeFlow/extension/build/CMakeFiles/edit_cache.dir
+/workspaces/waterCodeFlow/extension/build/CMakeFiles/rebuild_cache.dir

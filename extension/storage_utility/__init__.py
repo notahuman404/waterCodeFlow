@@ -265,4 +265,52 @@ class FastStorage:
                 pass
 
 
-__all__ = ['FastStorage']
+__all__ = ['FastStorage', 'ensure_dir', 'exists', 'read_json_safe', 'read_text', 'write_json', 'write_text']
+
+
+# ── Pure-Python filesystem helpers ──────────────────────────────────────────
+# codevovle/storage.py calls these as `su.ensure_dir(...)` etc.
+# They are intentionally simple: atomic writes via temp-file-then-rename are
+# not needed here because all writes go through OS-level journaling anyway.
+
+import json as _json
+
+
+def ensure_dir(path: str) -> None:
+    """Create directory (and parents) if it does not exist."""
+    import os
+    os.makedirs(path, exist_ok=True)
+
+
+def exists(path: str) -> bool:
+    """Return True if path exists on the filesystem."""
+    import os
+    return os.path.exists(path)
+
+
+def write_text(path: str, content: str) -> None:
+    """Write a UTF-8 text file atomically (write to .tmp then rename)."""
+    import os
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(content)
+    os.replace(tmp, path)
+
+
+def read_text(path: str) -> str:
+    """Read and return a UTF-8 text file's content."""
+    with open(path, "r", encoding="utf-8") as fh:
+        return fh.read()
+
+
+def write_json(path: str, data: object) -> None:
+    """Serialize *data* to JSON and write it atomically."""
+    write_text(path, _json.dumps(data, indent=2))
+
+
+def read_json_safe(path: str, default: object = None) -> object:
+    """Read and parse a JSON file; return *default* on any error."""
+    try:
+        return _json.loads(read_text(path))
+    except Exception:
+        return default

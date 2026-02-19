@@ -6,6 +6,7 @@ export declare class SettingsPanel {
     private readonly _panel;
     private _disposables;
     static createOrShow(extensionUri: vscode.Uri, bridge: GlueBridge): void;
+    private _pushSettings;
     private constructor();
     dispose(): void;
     private _getHtml;

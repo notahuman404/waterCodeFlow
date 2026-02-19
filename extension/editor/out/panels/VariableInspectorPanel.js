@@ -35,6 +35,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.VariableInspectorPanel = void 0;
 const vscode = __importStar(require("vscode"));
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
 const utils_1 = require("../utils");
 class VariableInspectorPanel {
     static createOrShow(extensionUri, bridge) {
@@ -43,49 +45,81 @@ class VariableInspectorPanel {
             VariableInspectorPanel.currentPanel._panel.reveal(column);
             return;
         }
-        const panel = vscode.window.createWebviewPanel('watercodeflow.variableInspector', 'Single Variable Inspection', column, { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')] });
+        const panel = vscode.window.createWebviewPanel('watercodeflow.variableInspector', 'Variable Inspector', column, { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')] });
         VariableInspectorPanel.currentPanel = new VariableInspectorPanel(panel, extensionUri, bridge);
     }
     constructor(panel, extensionUri, bridge) {
         this.bridge = bridge;
         this._disposables = [];
         this._panel = panel;
+        this._extensionUri = extensionUri;
         this._panel.webview.html = this._getHtml(panel.webview, extensionUri);
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
         this._panel.webview.onDidReceiveMessage(async (msg) => {
-            if (msg.command === 'ready') {
-                await this._pushVarData();
-            }
-            else if (msg.command === 'jumpToTick') {
-                const fp = vscode.window.activeTextEditor?.document.fileName || '';
-                if (fp && msg.tickId !== undefined) {
-                    try {
-                        await this.bridge.send('jumpToTick', { filePath: fp, tickId: msg.tickId });
+            switch (msg.command) {
+                case 'ready':
+                    await this._pushVarData(extensionUri);
+                    break;
+                case 'exportTimeline':
+                    const uri = await vscode.window.showSaveDialog({
+                        defaultUri: vscode.Uri.file(`${msg.varName}-timeline.json`),
+                        filters: { 'JSON': ['json'] }
+                    });
+                    if (uri) {
+                        fs.writeFileSync(uri.fsPath, JSON.stringify(msg.data, null, 2));
+                        vscode.window.showInformationMessage(`Timeline exported to ${uri.fsPath}`);
                     }
-                    catch (e) {
-                        vscode.window.showErrorMessage('Jump failed: ' + e.message);
-                    }
-                }
+                    break;
             }
         });
     }
-    async _pushVarData() {
+    async _pushVarData(extensionUri) {
         const fp = vscode.window.activeTextEditor?.document.fileName || '';
-        let timeline = [];
+        const extPath = extensionUri.fsPath;
+        // extPath IS the extension root
+        const projectRoot = extPath;
         let recordings = [];
-        if (fp) {
-            try {
-                recordings = await this.bridge.send('listRecordings', { filePath: fp });
+        // Load disk recordings — this is the PRIMARY source of truth
+        const recordingsDir = path.join(projectRoot, 'built', 'recordings');
+        try {
+            if (fs.existsSync(recordingsDir)) {
+                const files = fs.readdirSync(recordingsDir)
+                    .filter(f => f.endsWith('.json'))
+                    .sort()
+                    .reverse();
+                recordings = files.map(f => {
+                    try {
+                        const rec = JSON.parse(fs.readFileSync(path.join(recordingsDir, f), 'utf8'));
+                        return rec;
+                    }
+                    catch (_) {
+                        return null;
+                    }
+                }).filter(Boolean);
+                // Filter to current file if one is active
+                if (fp) {
+                    const forFile = recordings.filter(r => (r.filePath || r.file_path || '') === fp);
+                    if (forFile.length > 0) {
+                        recordings = forFile;
+                    }
+                }
             }
-            catch (_) { }
         }
-        this._panel.webview.postMessage({ command: 'setData', filePath: fp, timeline, recordings });
+        catch (_) { }
+        // Enrich with watcher events
+        recordings = recordings.map(rec => enrichWithWatcherEvents(rec, projectRoot));
+        this._panel.webview.postMessage({
+            command: 'setData',
+            recordings,
+            filePath: fp
+        });
     }
     dispose() {
         VariableInspectorPanel.currentPanel = undefined;
         this._panel.dispose();
-        while (this._disposables.length)
+        while (this._disposables.length) {
             this._disposables.pop()?.dispose();
+        }
     }
     _getHtml(webview, extensionUri) {
         const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'variableInspector.js'));
@@ -101,30 +135,32 @@ class VariableInspectorPanel {
   <link href="${styleUri}" rel="stylesheet">
 </head>
 <body>
-  <div class="vi-topbar">
-    <span class="vi-watcher">Watcher</span>
-    <span class="vi-title">Variable Inspector</span>
-  </div>
-  <hr class="vi-divider" />
-  <div class="vi-body">
-    <div class="vi-left">
-      <div class="vi-section-label">VALUE DISPLAY</div>
-      <pre class="vi-code" id="vi-code"></pre>
-      <div class="vi-btns">
-        <button class="vi-btn" id="btn-download">Download .pkl</button>
-        <button class="vi-btn" id="btn-print">Print Value</button>
+  <div class="vi-container">
+    <div class="vi-header">
+      <span class="vi-title">VARIABLE INSPECTOR</span>
+      <div class="vi-actions">
+        <button class="vi-btn" id="btn-download" title="Export timeline as JSON">⬇</button>
+        <button class="vi-btn" id="btn-print" title="Log to console">🖨</button>
       </div>
-      <pre class="vi-snippet" id="vi-snippet">from some_import_name import s
-s.inspect(variable_name="user_data", runs=5)</pre>
     </div>
-    <div class="vi-right">
-      <div class="vi-meta-header">Metadata</div>
-      <div class="vi-meta-list" id="vi-meta-list"></div>
+    <div class="vi-scrubber">
+      <div class="vi-dots" id="vi-dots"></div>
+      <div class="vi-time" id="vi-time">—</div>
     </div>
-  </div>
-  <div class="vi-timeline">
-    <div class="vi-time-label">Time: <span id="vi-time">14:30:00.005</span></div>
-    <div class="vi-dots" id="vi-dots"></div>
+    <div class="vi-split">
+      <div class="vi-code-pane">
+        <div class="vi-code-label">Value at selected run:</div>
+        <pre class="vi-code" id="vi-code">Select a variable to inspect its value across runs.</pre>
+      </div>
+      <div class="vi-meta-pane">
+        <div class="vi-meta-label">Variable Metadata:</div>
+        <div class="vi-meta-list" id="vi-meta-list"></div>
+      </div>
+    </div>
+    <div class="vi-snippet-pane">
+      <div class="vi-snippet-label">Inspection Info:</div>
+      <pre class="vi-snippet" id="vi-snippet"># Select a variable above to see its value history</pre>
+    </div>
   </div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
@@ -132,4 +168,42 @@ s.inspect(variable_name="user_data", runs=5)</pre>
     }
 }
 exports.VariableInspectorPanel = VariableInspectorPanel;
+function enrichWithWatcherEvents(rec, projectRoot) {
+    if (!rec || rec.vars) {
+        return rec;
+    }
+    const runId = rec.runId || rec.run_id;
+    if (!runId) {
+        return rec;
+    }
+    const watcherDir = path.join(projectRoot, 'built', 'watcher_events', runId);
+    if (!fs.existsSync(watcherDir)) {
+        return rec;
+    }
+    const varMap = {};
+    try {
+        fs.readdirSync(watcherDir).filter(f => f.endsWith('.jsonl')).forEach(file => {
+            fs.readFileSync(path.join(watcherDir, file), 'utf8')
+                .split('\n').filter(Boolean).forEach(line => {
+                try {
+                    const evt = JSON.parse(line);
+                    const name = evt.variable || evt.name;
+                    if (name) {
+                        varMap[name] = {
+                            name,
+                            value: evt.value ?? evt.new_value ?? null,
+                            scope: evt.scope || 'global',
+                            type: evt.type || typeof evt.value,
+                            line_no: evt.line_no || evt.lineno || 0,
+                            evolutions: (varMap[name]?.evolutions ?? 0) + 1,
+                        };
+                    }
+                }
+                catch (_) { }
+            });
+        });
+    }
+    catch (_) { }
+    return Object.keys(varMap).length > 0 ? { ...rec, vars: Object.values(varMap) } : rec;
+}
 //# sourceMappingURL=VariableInspectorPanel.js.map

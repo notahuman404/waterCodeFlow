@@ -23,13 +23,21 @@ class CLIError(Exception):
 def validate_cwd() -> None:
     """
     Validate that the current working directory is 'CodeVovle'.
-    
+
+    Skipped when the CODEVOVLE_SKIP_CWD_CHECK environment variable is set to
+    any non-empty value.  The VS Code extension sets this flag so the daemon
+    subprocess can run with CWD = extension root (where .codevovle/ lives)
+    rather than being forced to run from a directory named 'CodeVovle'.
+
     Raises:
-        CLIError: If CWD is not named 'CodeVovle'
+        CLIError: If CWD is not named 'CodeVovle' (and the env var is unset)
     """
+    if os.environ.get("CODEVOVLE_SKIP_CWD_CHECK"):
+        return
+
     cwd = os.getcwd()
     cwd_basename = os.path.basename(cwd)
-    
+
     if cwd_basename != "CodeVovle":
         raise CLIError(
             f"Error: CodeVovle CLI must be run from a directory named 'CodeVovle'\n"

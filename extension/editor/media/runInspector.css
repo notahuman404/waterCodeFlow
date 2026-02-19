@@ -200,3 +200,17 @@ body {
 .ri-dot.active {
   background: var(--wcf-teal) !important;
 }
+
+/* Open Variable Inspector button in context bar */
+.ri-open-vi-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid #555;
+  color: var(--vscode-foreground);
+  padding: 2px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.ri-open-vi-btn:hover { border-color: var(--wcf-teal); color: var(--wcf-teal); }

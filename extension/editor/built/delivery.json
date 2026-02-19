@@ -1,0 +1,30 @@
+{
+  "status": "success",
+  "timestamp": "2026-02-17T08:28:48.038923Z",
+  "vsix": "editor/built/recordings/ (VSIX requires npm install + vsce package inside editor/)",
+  "test_report": "editor/built/test-results/run-dispatch.log",
+  "tests_passed": 40,
+  "tests_failed": 0,
+  "notes": [
+    "1. codevovle run: REMOVED. No file contains '-m codevovle run'. Verified by test group 2 and 8.",
+    "2. Watcher CLI: GlueBridge.spawnRun() spawns 'python3 -m watcher.cli --user-script <file>' for Python and 'node watcher/adapters/javascript/index.js <file>' for JavaScript. useWatcher is always true for .py/.js/.mjs.",
+    "3. Single glue path: extension.ts has zero direct child_process calls. All runs go through bridge.spawnRun(). Verified by test group 3.",
+    "4. Recording JSON: each completed run writes built/recordings/<runId>.json with fields: runId, filePath, language, exitCode, recordingPath, timestamp, durationMs, useWatcher, stdout, stderr.",
+    "5. Recordings are interactive DOM entries: recordings.js builds cards with expand/collapse (dataset.expanded), play replay animation (rec-replay-fill), delete (deleteRecording message), export (exportRecording message). No mockup PNGs in the recordings list.",
+    "6. ARIA: all recording cards use role=button, aria-expanded, aria-label, tabindex=0 for keyboard accessibility.",
+    "7. Template: editor/webview/templates/recording-template.html is a reusable <template> element with data-field placeholders and data-action buttons.",
+    "8. RecordingsPanel._pushData() now reads built/recordings/*.json and passes them as 'recordings' array to the webview, merged with live glue data.",
+    "9. RecordingsPanel handles 'deleteRecording' and 'exportRecording' messages from the webview.",
+    "10. glue/adapter.py handles 'saveRecording' command \u2014 updates recording JSON with glue metadata.",
+    "DIFF summary \u2014 files changed:",
+    "  editor/src/extension.ts: replaced codevovle run block with WATCHER_EXTS Set + bridge.spawnRun() async call",
+    "  editor/src/GlueBridge.ts: added SpawnRunOptions/RunResult interfaces + spawnRun() method (python3 -m watcher.cli)",
+    "  editor/src/panels/RecordingsPanel.ts: added postRunEvent(), path import, _pushData reads built/recordings/, deleteRecording/exportRecording handlers",
+    "  editor/media/recordings.js: full rewrite \u2014 live run log, interactive recording cards, expand/collapse, play/delete/export",
+    "  editor/media/recordings.css: full rewrite \u2014 card styles, replay bar, run-log, ARIA-friendly tokens",
+    "  extension/glue/adapter.py: added saveRecording command handler",
+    "  editor/webview/templates/recording-template.html: new file",
+    "  editor/tests/run-dispatch.test.js: new file \u2014 40 tests across 12 groups",
+    "  editor/built/test-results/run-dispatch.log: test output"
+  ]
+}

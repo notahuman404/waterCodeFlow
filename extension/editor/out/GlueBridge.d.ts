@@ -4,19 +4,35 @@ export interface GlueResponse {
     result?: any;
     error?: string;
 }
-/**
- * GlueBridge: Persistent child process bridge to the Python glue adapter.
- * Sends JSON commands to stdin, reads JSON responses from stdout.
- */
+export interface SpawnRunOptions {
+    filePath: string;
+    extPath: string;
+    language: 'python' | 'javascript';
+    onStdout?: (chunk: string) => void;
+    onStderr?: (chunk: string) => void;
+}
+export interface RunResult {
+    runId: string;
+    filePath: string;
+    language: string;
+    exitCode: number;
+    recordingPath: string;
+    timestamp: string;
+    durationMs: number;
+    useWatcher: boolean;
+}
 export declare class GlueBridge {
     private _proc;
     private _pending;
     private _buf;
     private _extensionPath;
-    private _restarting;
+    private _projectRoot;
+    private _spawnError;
+    private _outputChannel;
     constructor(extensionPath: string);
     private _spawn;
     send(command: string, args?: Record<string, any>): Promise<any>;
+    spawnRun(opts: SpawnRunOptions): Promise<RunResult>;
     dispose(): void;
 }
 //# sourceMappingURL=GlueBridge.d.ts.map
