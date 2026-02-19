@@ -20,20 +20,14 @@ function highlightJson(json){
 }
 
 function buildVarCards(recs) {
-  // Collect unique variables across all recordings
-  const varMap = {};
-  recs.forEach((rec, recIdx) => {
-    const vars = rec.vars || rec.variables || [];
-    vars.forEach(v => {
-      const name = v.name || String(v);
-      if (!varMap[name]) {
-        varMap[name] = { id: name, label: name, versions: [], total: 0 };
-      }
-      varMap[name].versions.push({ recIdx, value: v.value, timestamp: rec.timestamp });
-      varMap[name].total = varMap[name].versions.length;
-    });
-  });
-  return Object.values(varMap);
+  const rec = recs[0];
+  if (!rec || !rec.vars) return [];
+  return rec.vars.map(v => ({
+    id: v.name,
+    label: v.name,
+    mutations: v.mutations,
+    currentMutationIdx: v.mutations.length - 1
+  }));
 }
 
 function buildMetaBlocks(recs) {
@@ -69,7 +63,7 @@ function renderCards(cards) {
   if (cards.length === 0) {
     const empty = document.createElement('div');
     empty.style.cssText = 'padding:16px;color:var(--vscode-descriptionForeground);font-style:italic;font-size:12px';
-    empty.textContent = 'No variable data captured yet. Run a Python or JS file with ▶ to start recording.';
+    empty.textContent = 'No variable data captured yet.';
     left.appendChild(empty);
     return;
   }
@@ -79,23 +73,39 @@ function renderCards(cards) {
     const cardEl = document.createElement('div'); cardEl.className = 'var-card'; cardEl.id = 'card-' + card.id;
     const hdr = document.createElement('div'); hdr.className = 'var-card-header'; hdr.textContent = card.label;
     const body = document.createElement('div'); body.className = 'var-card-body';
+    body.id = 'body-' + card.id;
 
-    // Show latest value
-    const latestVer = card.versions[card.versions.length - 1];
-    const displayVal = latestVer ? latestVer.value : null;
-    try {
-      body.innerHTML = highlightJson(JSON.stringify(displayVal !== undefined && displayVal !== null ? displayVal : '(no value)', null, 2));
-    } catch(_) {
-      body.textContent = String(displayVal);
-    }
+    const updateBody = (idx) => {
+      const mut = card.mutations[idx];
+      const displayVal = mut ? mut.value : null;
+      try {
+        body.innerHTML = highlightJson(JSON.stringify(displayVal !== undefined && displayVal !== null ? displayVal : '(no value)', null, 2));
+      } catch(_) {
+        body.textContent = String(displayVal);
+      }
+      const footer = cardEl.querySelector('.var-card-footer');
+      if (footer) footer.textContent = 'Mutation ' + (idx + 1) + ' of ' + card.mutations.length;
+
+      // Update metadata if this card is selected
+      if (selectedCard === card.id) {
+          updateMetadataDisplay(card, idx);
+      }
+    };
 
     const footer = document.createElement('div'); footer.className = 'var-card-footer';
-    footer.textContent = 'Version ' + card.total + ' of ' + card.total;
-    const bar = document.createElement('div'); bar.className = 'var-progress-bar';
-    const fill = document.createElement('div'); fill.className = 'var-progress-fill';
-    fill.style.width = '100%';
-    bar.appendChild(fill);
-    cardEl.appendChild(hdr); cardEl.appendChild(body); cardEl.appendChild(footer); cardEl.appendChild(bar);
+
+    // Per-variable scrollbar
+    const scroller = document.createElement('input');
+    scroller.type = 'range';
+    scroller.className = 'var-scroller';
+    scroller.min = 0;
+    scroller.max = card.mutations.length - 1;
+    scroller.value = card.currentMutationIdx;
+    scroller.addEventListener('input', () => {
+      updateBody(parseInt(scroller.value));
+    });
+
+    cardEl.appendChild(hdr); cardEl.appendChild(body); cardEl.appendChild(footer); cardEl.appendChild(scroller);
     cardEl.addEventListener('click', () => {
       selectedCard = selectedCard === card.id ? null : card.id;
       Object.keys(cardEls).forEach(id => cardEls[id].classList.toggle('selected', id === selectedCard));
@@ -105,6 +115,32 @@ function renderCards(cards) {
       }
     });
     left.appendChild(cardEl); cardEls[card.id] = cardEl;
+  });
+}
+
+function updateMetadataDisplay(card, idx) {
+  const mut = card.mutations[idx];
+  const block = document.getElementById('meta-block-' + card.id);
+  if (!block) return;
+
+  block.innerHTML = '';
+  const title = document.createElement('div'); title.className = 'ri-meta-block-title'; title.textContent = card.label;
+  block.appendChild(title);
+
+  const rows = [
+    { label: 'Variable name:', value: card.id },
+    { label: 'Scope:',         value: mut.scope || 'global' },
+    { label: 'Type:',          value: mut.type || typeof mut.value || '—' },
+    { label: 'File Path:',     value: mut.file || filePath || '—' },
+    { label: 'Line no.:',      value: mut.line_no != null ? String(mut.line_no) : '—' },
+    { label: 'Timestamp:',     value: mut.ts_ns ? (mut.ts_ns / 1e6).toFixed(2) + 'ms' : '—' },
+  ];
+
+  rows.forEach(r => {
+    const row = document.createElement('div'); row.className = 'ri-meta-row';
+    const lbl = document.createElement('div'); lbl.className = 'ri-meta-label'; lbl.textContent = r.label;
+    const val = document.createElement('div'); val.className = 'ri-meta-value'; val.textContent = r.value;
+    row.appendChild(lbl); row.appendChild(val); block.appendChild(row);
   });
 }
 
@@ -130,31 +166,73 @@ function renderMetaBlocks(blocks) {
   });
 }
 
-function renderDots() {
-  const total = recordings.length;
+function renderGlobalScroller(rec) {
   const el = document.getElementById('ri-dots'); el.innerHTML = '';
   const badge = document.getElementById('ri-step-badge');
-  if (total === 0) {
-    badge.textContent = 'No runs yet';
+
+  if (!rec || !rec.all_mutations || rec.all_mutations.length === 0) {
+    badge.textContent = 'No mutations';
     return;
   }
-  recordings.forEach((rec, i) => {
-    const d = document.createElement('div'); d.className = 'ri-dot' + (i === activeDot ? ' active' : '');
-    const ts = rec.timestamp ? new Date(rec.timestamp).toLocaleTimeString() : String(i + 1);
-    d.title = 'Run #' + (i + 1) + ' — ' + ts;
-    d.addEventListener('click', () => {
-      activeDot = i; renderDots();
-      refreshForDot(i);
+
+  const scroller = document.createElement('input');
+  scroller.type = 'range';
+  scroller.style.width = '100%';
+  scroller.min = 0;
+  scroller.max = rec.all_mutations.length - 1;
+  scroller.value = rec.all_mutations.length - 1;
+
+  const updateAll = (globalIdx) => {
+    const targetTs = rec.all_mutations[globalIdx].ts_ns;
+    badge.textContent = 'Mutation ' + (globalIdx + 1) + ' of ' + rec.all_mutations.length;
+
+    // Update all cards to their state at targetTs
+    const cards = document.querySelectorAll('.var-card');
+    cards.forEach(cardEl => {
+      const varName = cardEl.id.replace('card-', '');
+      const varData = rec.vars.find(v => v.name === varName);
+      if (varData) {
+          // Find latest mutation <= targetTs
+          let mutIdx = varData.mutations.length - 1;
+          while (mutIdx > 0 && varData.mutations[mutIdx].ts_ns > targetTs) {
+              mutIdx--;
+          }
+          // Update the card's local scroller and display
+          const localScroller = cardEl.querySelector('.var-scroller');
+          if (localScroller) {
+              localScroller.value = mutIdx;
+              const body = cardEl.querySelector('.var-card-body');
+              const mut = varData.mutations[mutIdx];
+              const displayVal = mut ? mut.value : null;
+              try {
+                body.innerHTML = highlightJson(JSON.stringify(displayVal !== undefined && displayVal !== null ? displayVal : '(no value)', null, 2));
+              } catch(_) {
+                body.textContent = String(displayVal);
+              }
+              const footer = cardEl.querySelector('.var-card-footer');
+              if (footer) footer.textContent = 'Mutation ' + (mutIdx + 1) + ' of ' + varData.mutations.length;
+
+              if (selectedCard === varName) {
+                  updateMetadataDisplay({ id: varName, label: varName, mutations: varData.mutations }, mutIdx);
+              }
+          }
+      }
     });
-    el.appendChild(d);
-  });
-  badge.textContent = 'Run #' + (activeDot + 1) + ' of ' + total;
+
+    // Update top context bar with current mutation info
+    const currentMut = rec.all_mutations[globalIdx];
+    document.getElementById('ri-lineno').innerHTML = 'Line: <strong style="color:var(--wcf-teal)">' + currentMut.line_no + '</strong>';
+    document.getElementById('ri-filepath').textContent = currentMut.file || filePath;
+  };
+
+  scroller.addEventListener('input', () => updateAll(parseInt(scroller.value)));
+  el.appendChild(scroller);
+  updateAll(rec.all_mutations.length - 1);
 }
 
-function refreshForDot(idx) {
+function refreshForRun(idx) {
   const rec = recordings[idx];
   if (!rec) { return; }
-  document.getElementById('ri-step-badge').textContent = 'Run #' + (idx + 1) + ' of ' + recordings.length;
   const titleEl = document.getElementById('ri-run-title');
   titleEl.textContent = 'Run #' + (idx + 1) + ' — ' + (rec.filePath || rec.file_path || filePath || '').split(/[\\/]/).pop();
   document.getElementById('ri-status').textContent = 'Exit: ' + (rec.exitCode != null ? rec.exitCode : '?') + '  Duration: ' + fmtMs(rec.durationMs);
@@ -163,6 +241,7 @@ function refreshForDot(idx) {
   const cards = buildVarCards([rec]);
   renderCards(cards);
   renderMetaBlocks(buildMetaBlocks([rec]));
+  renderGlobalScroller(rec);
 }
 
 function fmtMs(ms) {
@@ -218,9 +297,8 @@ window.addEventListener('message', evt => {
     }
 
     activeDot = Math.max(0, recordings.length - 1);
-    renderDots();
     if (recordings.length > 0) {
-      refreshForDot(activeDot);
+      refreshForRun(activeDot);
     } else {
       renderRun(null);
       renderCards([]);
@@ -234,7 +312,7 @@ window.addEventListener('message', evt => {
 const openViBtn = document.getElementById('ri-open-vi');
 if (openViBtn) {
   openViBtn.addEventListener('click', () => {
-    vscode.postMessage({ command: 'openVariableInspector' });
+    vscode.postMessage({ command: 'openVariableInspector', varName: selectedCard });
   });
 }
 

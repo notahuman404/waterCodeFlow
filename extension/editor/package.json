@@ -34,6 +34,21 @@
           "type": "webview",
           "id": "watercodeflow.variables",
           "name": "Variables"
+        },
+        {
+          "type": "webview",
+          "id": "watercodeflow.recordings",
+          "name": "Recordings"
+        },
+        {
+          "type": "webview",
+          "id": "watercodeflow.fileSelector",
+          "name": "Track Files"
+        },
+        {
+          "type": "webview",
+          "id": "watercodeflow.settings",
+          "name": "Settings"
         }
       ],
       "watercodeflow-panel": [

@@ -5,43 +5,37 @@ import { getNonce } from '../utils';
 
 const STORAGE_KEY = 'watercodeflow.trackedFiles';
 
-export class FileSelectorPanel {
+export class FileSelectorPanel implements vscode.WebviewViewProvider {
     public static currentPanel: FileSelectorPanel | undefined;
-    private readonly _panel: vscode.WebviewPanel;
+    private _view?: vscode.WebviewView;
     private _disposables: vscode.Disposable[] = [];
     private _selectedFiles: Set<string>;
     private _outputChannel: vscode.OutputChannel;
 
-    public static createOrShow(extensionUri: vscode.Uri, bridge: GlueBridge, context?: vscode.ExtensionContext) {
-        const column = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
-        if (FileSelectorPanel.currentPanel) {
-            FileSelectorPanel.currentPanel._panel.reveal(column);
-            return;
-        }
-        const panel = vscode.window.createWebviewPanel(
-            'watercodeflow.fileSelector', 'Select Files to Track', column,
-            { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')] }
-        );
-        FileSelectorPanel.currentPanel = new FileSelectorPanel(panel, extensionUri, bridge, context);
+    constructor(
+        private readonly _extensionUri: vscode.Uri,
+        private bridge: GlueBridge,
+        private context: vscode.ExtensionContext
+    ) {
+        this._outputChannel = vscode.window.createOutputChannel('WaterCodeFlow: Daemon');
+        const saved: string[] = context.globalState.get<string[]>(STORAGE_KEY, []) ?? [];
+        this._selectedFiles = new Set(saved);
+        FileSelectorPanel.currentPanel = this;
     }
 
-    private constructor(
-        panel: vscode.WebviewPanel,
-        extensionUri: vscode.Uri,
-        private bridge: GlueBridge,
-        private context?: vscode.ExtensionContext
+    public resolveWebviewView(
+        webviewView: vscode.WebviewView,
+        _context: vscode.WebviewViewResolveContext,
+        _token: vscode.CancellationToken
     ) {
-        this._panel = panel;
-        this._outputChannel = vscode.window.createOutputChannel('WaterCodeFlow: Daemon');
-        
-        // Restore persisted selections
-        const saved: string[] = context?.globalState.get<string[]>(STORAGE_KEY, []) ?? [];
-        this._selectedFiles = new Set(saved);
+        this._view = webviewView;
+        webviewView.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, 'media')]
+        };
+        webviewView.webview.html = this._getHtml(webviewView.webview, this._extensionUri);
 
-        this._panel.webview.html = this._getHtml(panel.webview, extensionUri);
-        this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-
-        this._panel.webview.onDidReceiveMessage(async (msg) => {
+        webviewView.webview.onDidReceiveMessage(async (msg) => {
             switch (msg.command) {
                 case 'ready':
                     await this._pushFiles();
@@ -52,7 +46,6 @@ export class FileSelectorPanel {
                     const fileName = path.basename(fp);
                     
                     if (this._selectedFiles.has(fp)) {
-                        // Stop tracking
                         this._outputChannel.appendLine(`\n[${new Date().toLocaleTimeString()}] STOP tracking: ${fp}`);
                         this._selectedFiles.delete(fp);
                         try {
@@ -64,7 +57,6 @@ export class FileSelectorPanel {
                             vscode.window.showErrorMessage(`Failed to stop tracking: ${e.message}`);
                         }
                     } else {
-                        // Start tracking
                         this._outputChannel.appendLine(`\n[${new Date().toLocaleTimeString()}] START tracking: ${fp}`);
                         this._outputChannel.show(true);
                         
@@ -82,11 +74,6 @@ export class FileSelectorPanel {
                                 numThreads: threads,
                             });
                             
-                            this._outputChannel.appendLine(`  → Result: ${JSON.stringify(result, null, 2)}`);
-                            
-                            // start_recording returns a plain integer PID — the old check
-                            // for result.pid / result.daemon_pid silently failed because
-                            // accessing .pid on a number gives undefined.
                             const pid: number | null =
                                 typeof result === 'number' ? result
                                 : (result?.pid ?? result?.daemon_pid ?? null);
@@ -97,31 +84,18 @@ export class FileSelectorPanel {
                                     `✓ Started tracking: ${fileName}  |  Daemon PID: ${pid}`
                                 );
                             } else {
-                                this._outputChannel.appendLine(`  ⚠ No PID returned — daemon may not have started`);
-                                vscode.window.showWarningMessage(
-                                    `Started tracking ${fileName} but no daemon PID was returned. ` +
-                                    `Check Output › WaterCodeFlow: Daemon for details.`
-                                );
+                                this._outputChannel.appendLine(`  ⚠ No PID returned`);
+                                vscode.window.showWarningMessage(`Started tracking ${fileName} but no PID returned.`);
                             }
                         } catch (e: any) {
                             this._outputChannel.appendLine(`  ✗ ERROR: ${e.message}`);
-                            this._outputChannel.appendLine(`  Stack: ${e.stack || 'no stack'}`);
-                            
-                            this._selectedFiles.delete(fp); // rollback on failure
-                            vscode.window.showErrorMessage(
-                                `Failed to start tracking: ${e.message}\n\n` +
-                                `Possible causes:\n` +
-                                `• CodeVovle core not installed\n` +
-                                `• Python dependencies missing\n` +
-                                `• File permissions issue\n\n` +
-                                `Check: Output > WaterCodeFlow: Daemon`
-                            );
+                            this._selectedFiles.delete(fp);
+                            vscode.window.showErrorMessage(`Failed to start tracking: ${e.message}`);
                         }
                     }
                     
-                    // Persist selection immediately
-                    await this.context?.globalState.update(STORAGE_KEY, Array.from(this._selectedFiles));
-                    this._panel.webview.postMessage({
+                    await this.context.globalState.update(STORAGE_KEY, Array.from(this._selectedFiles));
+                    this._view?.webview.postMessage({
                         command: 'updateSelected',
                         selected: Array.from(this._selectedFiles)
                     });
@@ -129,28 +103,17 @@ export class FileSelectorPanel {
                 }
 
                 case 'clearAll': {
-                    this._outputChannel.appendLine(`\n[${new Date().toLocaleTimeString()}] CLEAR ALL tracking`);
                     const failures: string[] = [];
                     for (const fp of this._selectedFiles) {
                         try {
                             await this.bridge.send('stopRecording', { filePath: fp });
-                            this._outputChannel.appendLine(`  ✓ Stopped: ${path.basename(fp)}`);
                         } catch (e: any) {
-                            this._outputChannel.appendLine(`  ✗ Failed: ${path.basename(fp)} - ${e.message}`);
                             failures.push(path.basename(fp));
                         }
                     }
                     this._selectedFiles.clear();
-                    await this.context?.globalState.update(STORAGE_KEY, []);
-                    this._panel.webview.postMessage({ command: 'updateSelected', selected: [] });
-                    
-                    if (failures.length > 0) {
-                        vscode.window.showWarningMessage(
-                            `Cleared all selections. Failed to stop: ${failures.join(', ')}`
-                        );
-                    } else {
-                        vscode.window.showInformationMessage('✓ Cleared all file tracking');
-                    }
+                    await this.context.globalState.update(STORAGE_KEY, []);
+                    this._view?.webview.postMessage({ command: 'updateSelected', selected: [] });
                     break;
                 }
             }
@@ -158,6 +121,7 @@ export class FileSelectorPanel {
     }
 
     private async _pushFiles() {
+        if (!this._view) return;
         const folders = vscode.workspace.workspaceFolders;
         let files: Array<{ name: string; path: string; displayPath: string; branch: string; selected: boolean }> = [];
 
@@ -179,13 +143,12 @@ export class FileSelectorPanel {
             } catch (_) {}
         }
 
-        this._panel.webview.postMessage({ command: 'setFiles', files });
+        this._view.webview.postMessage({ command: 'setFiles', files });
     }
 
     public dispose() {
         FileSelectorPanel.currentPanel = undefined;
         this._outputChannel.dispose();
-        this._panel.dispose();
         while (this._disposables.length) { this._disposables.pop()?.dispose(); }
     }
 
@@ -209,7 +172,7 @@ export class FileSelectorPanel {
       <input type="text" id="file-filter" class="file-filter" placeholder="Filter by name or path..." />
     </div>
     <div class="fs-toolbar">
-      <p class="hint-text">Select files for daemon tracking. Changes appear in the sidebar scrubber. Check Output > WaterCodeFlow: Daemon for logs.</p>
+      <p class="hint-text">Select files for daemon tracking. Changes appear in the sidebar scrubber.</p>
       <button id="clear-all-btn" class="clear-btn">Clear All</button>
     </div>
     <div class="file-list" id="file-list"><div class="loading">Loading...</div></div>

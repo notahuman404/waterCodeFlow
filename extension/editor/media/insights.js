@@ -39,19 +39,17 @@ function buildNodes() {
   // ── Main-line nodes (one per real run, left→right = oldest→newest) ─────────
   const mainRecs = diskRecordings.slice(); // already sorted newest-first from panel, reverse for display
   mainRecs.reverse(); // oldest first
-  const mainCount = Math.min(mainRecs.length, 12);
-  const xPad = 0.07;
-  const mainXs = mainCount === 1
-    ? [W * 0.5]
-    : Array.from({ length: mainCount }, (_, i) => (xPad + i * ((1 - 2 * xPad) / (mainCount - 1))) * W);
+  const mainCount = mainRecs.length;
+  const xStep = 80;
+  const xPad = 50;
 
-  mainXs.forEach((x, i) => {
-    const rec = mainRecs[i];
+  mainRecs.forEach((rec, i) => {
+    const x = xPad + i * xStep;
     const runLabel = '#' + (i + 1);
     result.push({
       id:         'main-' + i,
       x, y:       midY,
-      rx: 20, ry: 12,
+      rx: 15, ry: 15,
       type:       'main',
       branchName: 'main',
       recIndex:   i,
@@ -62,28 +60,42 @@ function buildNodes() {
     });
   });
 
-  // ── Branch nodes (one cluster per branch from the bridge) ─────────────────
+  // ── Branch nodes logic per requirement ──────────────────────────────────
+  // pattern: 1 -> above, 2 -> above and down, 3 -> 2 above 1 down
   if (branches.length > 0) {
     const mainNodes = result.filter(n => n.type === 'main');
-    branches.forEach((branch, bi) => {
-      // Attach each branch off an evenly-spaced main node
-      const srcIdx = Math.min(bi + 1, mainNodes.length - 1);
-      const src = mainNodes[srcIdx];
-      if (!src) return;
+    const bCount = branches.length;
 
-      // Branch node sits to the upper-right of its source
-      const bx = src.x + 50;
-      const by = midY - 60 - bi * 30;
+    branches.forEach((branch, bi) => {
+      // Find source node based on forked_at_tick
+      let src = mainNodes.find(n => n.recIndex === branch.forked_at_tick) || mainNodes[0];
+
+      let offsetX = 40;
+      let offsetY = 0;
+
+      if (bCount === 1) {
+        offsetY = -60; // 1 above
+      } else if (bCount === 2) {
+        offsetY = bi === 0 ? -60 : 60; // 1 above, 1 down
+      } else if (bCount === 3) {
+        if (bi === 0) offsetY = -90; // 2 above (top)
+        else if (bi === 1) offsetY = -45; // 2 above (bottom)
+        else offsetY = 60; // 1 down
+      } else {
+        // Generic pattern for more branches
+        offsetY = (bi % 2 === 0 ? -1 : 1) * (40 + Math.floor(bi/2) * 30);
+      }
+
       result.push({
-        id:         'branch-' + bi + '-0',
-        x:          bx,
-        y:          by,
-        rx:         13, ry: 8,
+        id:         'branch-' + bi,
+        x:          src.x + offsetX,
+        y:          midY + offsetY,
+        rx:         12, ry: 12,
         type:       'branch',
         branchName: branch.name || ('branch-' + bi),
         recIndex:   -1,
         runId:      null,
-        label:      (branch.name || '').slice(0, 8),
+        label:      (branch.label || branch.name || '').slice(0, 5),
         srcX:       src.x,
         srcY:       src.y,
         timestamp:  null,
@@ -273,10 +285,11 @@ canvas.addEventListener('click', e => {
     nodeStates[n.id] = 'second';
     selectionOrder.push(n.id);
   } else {
-    // Already 2 selected — replace the oldest one
+    // Already 2 selected — replace the oldest one (sliding window)
     delete nodeStates[selectionOrder[0]];
     selectionOrder.shift();
-    nodeStates[n.id] = 'second';
+    nodeStates[selectionOrder[0]] = 'first'; // Previous second becomes first
+    nodeStates[n.id] = 'second';             // New selection becomes second
     selectionOrder.push(n.id);
   }
   draw();

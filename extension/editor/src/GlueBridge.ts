@@ -209,6 +209,32 @@ export class GlueBridge {
         const watcherCliScript = path.join(projectRoot, 'watcher', 'cli', 'main.py');
         const watcherOutputDir = path.join(projectRoot, 'built', 'watcher_events', runId);
 
+        // Load settings from VS Code config
+        const cfg = vscode.workspace.getConfiguration('watercodeflow');
+        const trackThreads = cfg.get('trackThreads', true);
+        const trackLocals = cfg.get('trackLocals', false);
+        const trackSql = cfg.get('trackSql', true);
+        const trackAll = cfg.get('trackAll', true);
+        const logLevel = cfg.get('logLevel', 'WARNING');
+        const mutationDepth = cfg.get('mutationDepth', 'FULL');
+        const filesScope = cfg.get('filesScope', '');
+        const customProcessor = cfg.get('customProcessor', '');
+
+        const watcherArgs = [
+            watcherCliScript,
+            '--user-script', filePath,
+            '--output', watcherOutputDir,
+            '--log-level', logLevel,
+        ];
+
+        if (trackThreads) { watcherArgs.push('--track-threads'); }
+        if (trackLocals) { watcherArgs.push('--track-locals'); }
+        if (trackSql) { watcherArgs.push('--track-sql'); }
+        if (trackAll) { /* watcher cli might not have --track-all yet, but following pattern */ }
+        if (mutationDepth) { watcherArgs.push('--mutation-depth', mutationDepth.toUpperCase().replace(' & ', '_')); }
+        if (filesScope) { watcherArgs.push('--files-scope', filesScope); }
+        if (customProcessor) { watcherArgs.push('--custom-processor', customProcessor); }
+
         // LD_LIBRARY_PATH so watcher's C++ shared libs are resolved at runtime
         const watcherBuildDir = path.join(projectRoot, 'watcher', 'build');
         const ldLibPath = [watcherBuildDir, process.env.LD_LIBRARY_PATH || '']
@@ -220,12 +246,7 @@ export class GlueBridge {
 
         if (language === 'python') {
             if (fs.existsSync(watcherCliScript)) {
-                proc = cp.spawn('python3', [
-                    watcherCliScript,
-                    '--user-script', filePath,
-                    '--output', watcherOutputDir,
-                    '--log-level', 'WARNING',
-                ], {
+                proc = cp.spawn('python3', watcherArgs, {
                     cwd: projectRoot,
                     env: spawnEnv,
                 });

@@ -220,14 +220,14 @@ function render(data) {
 
   container.innerHTML = '';
 
-  // ── SECTION 1: Files — Tracked ────────────────────────────────────────────
+  // ── SECTION 1: File Recordings (CodeVovle) ────────────────────────────────
   const s1 = el('div', 'rec-section');
   const s1hdr = el('div', 'rec-section-header');
-  s1hdr.innerHTML = '<strong>Files</strong><span class="header-normal"> — Tracked</span>';
+  s1hdr.innerHTML = '<strong>File Recordings</strong><span class="header-normal"> (CodeVovle)</span>';
   s1.appendChild(s1hdr);
 
   if (trackedFiles.length === 0) {
-    s1.appendChild(el('p', 'rec-hint', 'No tracked files yet. Use "Select Files to Track" or press ▶ to run a Python or JS file.'));
+    s1.appendChild(el('p', 'rec-hint', 'No tracked files. Select files to start CodeVovle recording.'));
   } else {
     trackedFiles.forEach(f => {
       const fpath = f.path || '';
@@ -236,25 +236,23 @@ function render(data) {
 
       const row = el('div', 'rec-row' + (isActive ? ' rec-row-active' : ''));
       row.style.cursor = 'pointer';
-      row.title = 'Click to filter recordings for this file';
-      const fileRecCount = recordings.filter(r => (r.filePath || r.file_path || '') === fpath).length;
+      row.title = 'Click to see file timeline';
       row.innerHTML = '<span class="teal-check">&#10003;</span>' +
         '<span class="rec-filename">' + name + '</span>' +
-        '<span class="rec-filepath"> ' + fpath + '</span>' +
-        (fileRecCount > 0 ? '<span class="rec-run-badge">' + fileRecCount + ' run' + (fileRecCount > 1 ? 's' : '') + '</span>' : '');
+        '<span class="rec-filepath"> ' + fpath + '</span>';
 
       row.addEventListener('click', () => {
-        // Toggle filter: clicking same file again clears filter
         _filterFile = (isActive ? null : fpath);
+        // Opening file recording opens the "Down Panel" (which is the RecordingViewer sidebar/panel)
+        vscode.postMessage({ command: 'openFileRecording', filePath: fpath });
         render(null);
       });
       s1.appendChild(row);
     });
-    s1.appendChild(el('p', 'rec-hint', 'Click a file to filter its recordings below.'));
   }
   container.appendChild(s1);
 
-  // ── SECTION 2: Variables — Evolution ─────────────────────────────────────
+  // ── SECTION 2: Variable Recording (Watcher) ──────────────────────────────
   // Aggregate actual variable evolution counts from real recording data on disk.
   // Don't rely on listTrackedVariables which returns config-only objects without evolutions.
   const varEvoMap = {};
@@ -274,54 +272,45 @@ function render(data) {
 
   const s2 = el('div', 'rec-section');
   const s2hdr = el('div', 'rec-section-header');
-  s2hdr.innerHTML = '<strong>Variables</strong><span class="header-normal"> — Evolution</span>';
+  s2hdr.innerHTML = '<strong>Variable History</strong><span class="header-normal"> (Watcher)</span>';
   s2.appendChild(s2hdr);
 
   if (aggVars.length === 0) {
-    s2.appendChild(el('p', 'rec-hint', 'Open a Python or JS file and run it to see variable evolution data.'));
+    s2.appendChild(el('p', 'rec-hint', 'Run a file to see variable history.'));
   } else {
     aggVars.forEach(v => {
       const row = el('div', 'rec-row');
       row.style.cursor = 'pointer';
-      row.title = 'Click to open Variable Inspector for this variable';
+      row.title = 'Click to see change of this variable';
       const scope = v.scope ? '<span class="rec-var-scope"> ' + v.scope + '</span>' : '';
       row.innerHTML = '<span class="rec-var-name">' + v.name + '</span>' + scope +
         '<span class="rec-count">evolutions: ' + v.evolutions + '</span>';
       row.addEventListener('click', () => vscode.postMessage({ command: 'openVariableInspector', varName: v.name }));
       s2.appendChild(row);
     });
-    s2.appendChild(el('p', 'rec-hint', 'Updates when variables change across runs.'));
   }
   container.appendChild(s2);
 
-  // ── SECTION 3: Runs — Recordings ─────────────────────────────────────────
+  // ── SECTION 3: Run Recording ─────────────────────────────────────────────
   const s3 = el('div', 'rec-section');
   const s3hdr = el('div', 'rec-section-header');
-  const filterLabel = _filterFile ? ' for <em>' + (_filterFile.split(/[\\/]/).pop() || _filterFile) + '</em>' : '';
-  s3hdr.innerHTML = '<strong>Runs</strong><span class="header-normal"> — Recordings' + filterLabel + '</span>';
-  if (_filterFile) {
-    const clearBtn = el('button', 'rec-clear-filter-btn', '✕ Clear filter');
-    clearBtn.addEventListener('click', () => { _filterFile = null; render(null); });
-    s3hdr.appendChild(clearBtn);
-  }
+  s3hdr.innerHTML = '<strong>Run History</strong><span class="header-normal"> (Watcher)</span>';
   s3.appendChild(s3hdr);
 
-  // Filter recordings by selected file if active
-  const visibleRecs = _filterFile
-    ? recordings.filter(r => (r.filePath || r.file_path || '') === _filterFile)
-    : recordings;
+  const visibleRecs = recordings; // No filter here normally
 
   if (visibleRecs.length === 0) {
-    if (_filterFile) {
-      s3.appendChild(el('p', 'rec-hint', 'No recordings for this file yet. Press ▶ to run it.'));
-    } else {
-      s3.appendChild(el('p', 'rec-hint', 'No runs recorded yet. Press ▶ to start.'));
-    }
+    s3.appendChild(el('p', 'rec-hint', 'No runs recorded. Press ▶ to start.'));
   } else {
-    // Display newest first, numbered from most recent (Run #1 = most recent)
     visibleRecs.forEach((r, idx) => {
-      const runNumber = visibleRecs.length - idx; // ascending run numbers oldest→newest
-      s3.appendChild(buildRecordingCard(r, runNumber));
+      const runNumber = visibleRecs.length - idx;
+      const card = buildRecordingCard(r, runNumber);
+      // Change card click behavior to open Run Inspector
+      card.querySelector('.rec-card-header').addEventListener('click', (e) => {
+          e.stopPropagation();
+          vscode.postMessage({ command: 'openRunInspector', runId: r.runId || r.run_id });
+      });
+      s3.appendChild(card);
     });
   }
   container.appendChild(s3);

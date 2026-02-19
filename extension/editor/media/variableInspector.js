@@ -22,7 +22,25 @@ function getVarData(varName, recIdx) {
   const rec = recordings[recIdx];
   if (!rec) { return null; }
   const vars = rec.vars || rec.variables || [];
-  return vars.find(v => (v.name || v) === varName) || null;
+  const v = vars.find(v => (v.name || v) === varName);
+  if (!v) return null;
+  // If we have mutations array, use it
+  if (v.mutations) return v.mutations[v.mutations.length - 1];
+  return v;
+}
+
+function getMutations(varName) {
+    const all = [];
+    recordings.forEach(rec => {
+        const vars = rec.vars || rec.variables || [];
+        const v = vars.find(x => (x.name || x) === varName);
+        if (v && v.mutations) {
+            v.mutations.forEach(m => all.push({ ...m, timestamp: rec.timestamp }));
+        } else if (v) {
+            all.push({ ...v, timestamp: rec.timestamp });
+        }
+    });
+    return all.sort((a, b) => (a.ts_ns || 0) - (b.ts_ns || 0));
 }
 
 function getAllVarNames() {
@@ -112,34 +130,68 @@ function renderVarSelector() {
 }
 
 function renderDots() {
-  const total = recordings.length;
   const el = document.getElementById('vi-dots'); el.innerHTML = '';
   const timeEl = document.getElementById('vi-time');
-  if (total === 0) {
+
+  if (!currentVar) {
+      timeEl.textContent = '—';
+      return;
+  }
+
+  const mutations = getMutations(currentVar);
+  if (mutations.length === 0) {
     timeEl.textContent = '—';
     return;
   }
-  recordings.forEach((rec, i) => {
+
+  mutations.forEach((mut, i) => {
     const d = document.createElement('div'); d.className = 'vi-dot' + (i === activeDot ? ' active' : '');
-    const ts = rec.timestamp ? new Date(rec.timestamp).toLocaleTimeString() : String(i + 1);
-    d.title = 'Run #' + (i + 1) + ' — ' + ts;
+    const ts = mut.timestamp ? new Date(mut.timestamp).toLocaleTimeString() : '';
+    d.title = 'Mutation #' + (i + 1) + (ts ? ' — ' + ts : '');
     d.style.background = i === activeDot ? '' : '#f5a623';
     d.addEventListener('click', () => {
       activeDot = i;
       renderDots();
-      renderCode(currentVar, activeDot);
-      renderMeta(currentVar, activeDot);
-      const rec = recordings[i];
-      if (rec) {
-        timeEl.textContent = rec.timestamp ? new Date(rec.timestamp).toLocaleTimeString() : String(i);
+
+      // Update display with this mutation's data
+      const codeEl = document.getElementById('vi-code');
+      const val = mut.value;
+      if (val !== null) {
+        try {
+          codeEl.innerHTML = highlightJson(JSON.stringify(val, null, 2));
+        } catch(_) {
+          codeEl.textContent = String(val);
+        }
       }
+
+      // Update metadata
+      const metaEl = document.getElementById('vi-meta-list');
+      metaEl.innerHTML = '';
+      const metaRows = [
+        { label: 'Variable name', value: currentVar || '—' },
+        { label: 'Scope',         value: mut.scope || 'global' },
+        { label: 'Type',          value: mut.type || (mut.value !== undefined ? typeof mut.value : '—') },
+        { label: 'File Path',     value: mut.file || filePath || '—' },
+        { label: 'Line no.',      value: mut.line_no != null ? String(mut.line_no) : '—' },
+        { label: 'Timestamp',     value: mut.timestamp ? new Date(mut.timestamp).toLocaleString() : '—' },
+        { label: 'Mutation ID',   value: String(i + 1) },
+      ];
+      metaRows.forEach(m => {
+        const row = document.createElement('div'); row.className = 'vi-meta-row';
+        const lbl = document.createElement('div'); lbl.className = 'vi-meta-label'; lbl.textContent = m.label;
+        const val = document.createElement('div'); val.className = 'vi-meta-value'; val.textContent = m.value;
+        row.appendChild(lbl); row.appendChild(val); metaEl.appendChild(row);
+      });
+
+      timeEl.textContent = mut.timestamp ? new Date(mut.timestamp).toLocaleTimeString() : '—';
     });
     el.appendChild(d);
   });
-  const activeRec = recordings[activeDot];
-  timeEl.textContent = activeRec && activeRec.timestamp
-    ? new Date(activeRec.timestamp).toLocaleTimeString()
-    : '—';
+
+  const activeMut = mutations[activeDot];
+  if (activeMut) {
+    timeEl.textContent = activeMut.timestamp ? new Date(activeMut.timestamp).toLocaleTimeString() : '—';
+  }
 }
 
 function renderSnippet() {
