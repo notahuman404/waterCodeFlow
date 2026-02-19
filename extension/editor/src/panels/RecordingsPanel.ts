@@ -8,7 +8,6 @@ import { getNonce } from '../utils';
 function enrichRecordingWithVars(rec: any, extPath: string): any {
     const runId = rec.runId || rec.run_id;
     if (!runId || rec.vars) { return rec; }
-    // extPath IS the extension root (no need to go up one level)
     const projectRoot = extPath;
     const watcherDir = path.join(projectRoot, 'built', 'watcher_events', runId);
     if (!fs.existsSync(watcherDir)) { return rec; }
@@ -37,53 +36,46 @@ function enrichRecordingWithVars(rec: any, extPath: string): any {
     return Object.keys(varMap).length > 0 ? { ...rec, vars: Object.values(varMap) } : rec;
 }
 
-export class RecordingsPanel {
+export class RecordingsPanel implements vscode.WebviewViewProvider {
     public static currentPanel: RecordingsPanel | undefined;
-    private readonly _panel: vscode.WebviewPanel;
+    private _view?: vscode.WebviewView;
     private _disposables: vscode.Disposable[] = [];
     private _extensionUri: vscode.Uri;
     private _lastPushedFilePath: string = '';
 
-    public static createOrShow(extensionUri: vscode.Uri, bridge: GlueBridge) {
-        const column = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
-        if (RecordingsPanel.currentPanel) {
-            RecordingsPanel.currentPanel._panel.reveal(column);
-            return;
-        }
-        const panel = vscode.window.createWebviewPanel(
-            'watercodeflow.recordings', 'Recordings', column,
-            { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')] }
-        );
-        RecordingsPanel.currentPanel = new RecordingsPanel(panel, extensionUri, bridge);
-    }
-
-    /** Forward a run lifecycle event (stdout, stderr, done, error) into the webview. */
-    public postRunEvent(type: string, data: string) {
-        // Make sure the panel is visible so the user can see live output
-        if (!this._panel.visible) {
-            this._panel.reveal(vscode.ViewColumn.Beside, true);
-        }
-        this._panel.webview.postMessage({ command: 'run.event', type, data });
-    }
-
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, private bridge: GlueBridge) {
-        this._panel = panel;
+    constructor(extensionUri: vscode.Uri, private bridge: GlueBridge, private context: vscode.ExtensionContext) {
         this._extensionUri = extensionUri;
-        this._panel.webview.html = this._getHtml(panel.webview, extensionUri);
-        this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+        RecordingsPanel.currentPanel = this;
+    }
 
-        this._panel.webview.onDidReceiveMessage(async (msg: any) => {
+    public resolveWebviewView(
+        webviewView: vscode.WebviewView,
+        _context: vscode.WebviewViewResolveContext,
+        _token: vscode.CancellationToken
+    ) {
+        this._view = webviewView;
+        webviewView.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, 'media')]
+        };
+        webviewView.webview.html = this._getHtml(webviewView.webview, this._extensionUri);
+
+        webviewView.webview.onDidReceiveMessage(async (msg: any) => {
             switch (msg.command) {
                 case 'ready':
                     await this._pushData();
                     break;
 
                 case 'openRunInspector':
-                    vscode.commands.executeCommand('watercodeflow.openRunInspector');
+                    vscode.commands.executeCommand('watercodeflow.openRunInspector', { runId: msg.runId });
                     break;
 
                 case 'openVariableInspector':
-                    vscode.commands.executeCommand('watercodeflow.openInspector');
+                    vscode.commands.executeCommand('watercodeflow.openInspector', { varName: msg.varName });
+                    break;
+
+                case 'openFileRecording':
+                    vscode.commands.executeCommand('watercodeflow.recordingViewer.focus');
                     break;
 
                 case 'deleteRun': {
@@ -101,7 +93,6 @@ export class RecordingsPanel {
 
                 case 'deleteRecording': {
                     const extPath = this._extensionUri.fsPath;
-                    // extPath IS the extension root (no need to go up one level)
                     const projectRoot = extPath;
                     const recordingsDir = path.join(projectRoot, 'built', 'recordings');
                     try {
@@ -113,12 +104,9 @@ export class RecordingsPanel {
                             }
                         }
                     } catch (_) {}
-                    // Also tell glue to remove it (non-fatal)
                     this.bridge.send('deleteRecording', { runId: msg.runId }).catch((e: any) => {
                         console.warn('deleteRecording glue call failed:', e.message);
-                        // Non-fatal: disk deletion already happened
                     });
-                    this._panel.webview.postMessage({ command: 'recordingDeleted', runId: msg.runId });
                     await this._pushData();
                     break;
                 }
@@ -140,13 +128,16 @@ export class RecordingsPanel {
         });
     }
 
+    public postRunEvent(type: string, data: string) {
+        this._view?.webview.postMessage({ command: 'run.event', type, data });
+    }
+
     private async _pushData() {
+        if (!this._view) { return; }
         const fp = vscode.window.activeTextEditor?.document.fileName || '';
         const extPath = this._extensionUri.fsPath;
-        // extPath IS the extension root — no need to go up one level
         const projectRoot = extPath;
 
-        // ── 1. spawnRun recordings from built/recordings/*.json ──────────────
         let recordings: any[] = [];
         const recordingsDir = path.join(projectRoot, 'built', 'recordings');
         try {
@@ -154,7 +145,7 @@ export class RecordingsPanel {
                 const files = fs.readdirSync(recordingsDir)
                     .filter(f => f.endsWith('.json'))
                     .sort()
-                    .reverse(); // newest first
+                    .reverse();
                 recordings = files.map(f => {
                     try {
                         const rec = JSON.parse(fs.readFileSync(path.join(recordingsDir, f), 'utf8'));
@@ -164,14 +155,10 @@ export class RecordingsPanel {
             }
         } catch (_) {}
 
-        // ── 2. Daemon-based runs from .codevovle/ (via glue listRuns) ────────
-        // These are created by the background recording daemon (track file button).
-        // Merge them with spawnRun recordings so both show up in the panel.
         if (fp) {
             try {
                 const daemonRuns = await this.bridge.send('listRuns', { filePath: fp }) as any[];
                 if (Array.isArray(daemonRuns) && daemonRuns.length > 0) {
-                    // Avoid duplicating runs already in the JSON recordings list
                     const existingIds = new Set(recordings.map((r: any) => r.runId || r.run_id));
                     for (const run of daemonRuns) {
                         if (!existingIds.has(run.runId) && !existingIds.has(run.run_id)) {
@@ -182,7 +169,6 @@ export class RecordingsPanel {
             } catch (_) {}
         }
 
-        // ── 3. Tracked files — derived from all recordings ───────────────────
         const seen = new Set<string>();
         const trackedFiles: any[] = [];
         recordings.forEach(r => {
@@ -193,7 +179,6 @@ export class RecordingsPanel {
             }
         });
 
-        // Also include the active file even if it has no recordings yet
         if (fp && !seen.has(fp)) {
             try {
                 const recs = await this.bridge.send('listRecordings', { filePath: fp }) as any[];
@@ -203,7 +188,6 @@ export class RecordingsPanel {
             } catch (_) {}
         }
 
-        // ── 4. Variable evolutions from glue ─────────────────────────────────
         let vars: any[] = [];
         if (fp) {
             try {
@@ -215,7 +199,7 @@ export class RecordingsPanel {
         const resetFilter = this._lastPushedFilePath !== fp;
         this._lastPushedFilePath = fp;
 
-        this._panel.webview.postMessage({
+        this._view.webview.postMessage({
             command: 'setData',
             trackedFiles,
             vars,
@@ -228,7 +212,6 @@ export class RecordingsPanel {
 
     public dispose() {
         RecordingsPanel.currentPanel = undefined;
-        this._panel.dispose();
         while (this._disposables.length) { this._disposables.pop()?.dispose(); }
     }
 

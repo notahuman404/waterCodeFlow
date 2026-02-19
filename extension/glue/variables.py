@@ -147,22 +147,39 @@ def _extract_variables_ast(file_path: str) -> List[Dict[str, Any]]:
 
     assignment_counts: Dict[str, int] = defaultdict(int)
     first_line: Dict[str, int] = {}
-    scope_map: Dict[str, str] = {}
+    # Use a set of scopes per variable
+    variable_scopes: Dict[str, set[str]] = defaultdict(set)
 
     class Visitor(ast.NodeVisitor):
         def __init__(self):
             self._scope = "global"
 
+        def visit_ClassDef(self, node):
+            name = node.name
+            assignment_counts[name] += 1
+            first_line.setdefault(name, node.lineno)
+            variable_scopes[name].add(self._scope)
+
+            old = self._scope
+            self._scope = "local"
+            self.generic_visit(node)
+            self._scope = old
+
         def visit_FunctionDef(self, node):
+            name = node.name
+            assignment_counts[name] += 1
+            first_line.setdefault(name, node.lineno)
+            variable_scopes[name].add(self._scope)
+
             old = self._scope
             self._scope = "local"
             for arg in node.args.args + node.args.posonlyargs + node.args.kwonlyargs:
-                name = arg.arg
-                if name in ("self", "cls"):
+                arg_name = arg.arg
+                if arg_name in ("self", "cls"):
                     continue
-                assignment_counts[name] += 1
-                first_line.setdefault(name, node.lineno)
-                scope_map.setdefault(name, "parameter")
+                assignment_counts[arg_name] += 1
+                first_line.setdefault(arg_name, node.lineno)
+                variable_scopes[arg_name].add("local") # Parameters are local
             self.generic_visit(node)
             self._scope = old
 
@@ -173,7 +190,7 @@ def _extract_variables_ast(file_path: str) -> List[Dict[str, Any]]:
                 for name in _names_in_target(target):
                     assignment_counts[name] += 1
                     first_line.setdefault(name, node.lineno)
-                    scope_map.setdefault(name, self._scope)
+                    variable_scopes[name].add(self._scope)
             self.generic_visit(node)
 
         def visit_AugAssign(self, node):
@@ -209,13 +226,60 @@ def _extract_variables_ast(file_path: str) -> List[Dict[str, Any]]:
     for name, count in sorted(assignment_counts.items(), key=lambda x: -x[1]):
         if SKIP.match(name):
             continue
+
+        scopes = variable_scopes.get(name, {"global"})
+        if "local" in scopes and "global" in scopes:
+            scope = "both"
+        elif "local" in scopes:
+            scope = "local"
+        elif "parameter" in scopes: # Not really used anymore as I map to local
+            scope = "local"
+        else:
+            scope = "global"
+
         results.append({
             "name": name,
             "evolutions": count,
-            "scope": scope_map.get(name, "global"),
+            "scope": scope,
             "line_no": first_line.get(name, 0),
         })
     return results[:40]
+
+
+def _extract_variables_js(file_path: str) -> List[Dict[str, Any]]:
+    """Simple regex-based extraction for JavaScript variables, classes, and functions."""
+    try:
+        src = Path(file_path).read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return []
+
+    results = []
+    # Regex for:
+    # 1. class Name
+    # 2. function Name
+    # 3. const/let/var Name
+    # 4. Name = ... (global or already defined)
+    patterns = [
+        (re.compile(r"\bclass\s+([a-zA-Z_$][\w$]*)"), "class"),
+        (re.compile(r"\bfunction\s+([a-zA-Z_$][\w$]*)"), "function"),
+        (re.compile(r"\b(?:const|let|var)\s+([a-zA-Z_$][\w$]*)"), "local"),
+        (re.compile(r"\b([a-zA-Z_$][\w$]*)\s*=\s*[^=]"), "assignment"),
+    ]
+
+    seen = {}
+    lines = src.splitlines()
+    for i, line in enumerate(lines, 1):
+        for pattern, scope in patterns:
+            for match in pattern.finditer(line):
+                name = match.group(1)
+                if name in ("if", "for", "while", "switch", "return", "class", "function", "const", "let", "var"):
+                    continue
+                if name not in seen:
+                    seen[name] = {"name": name, "evolutions": 1, "scope": scope, "line_no": i}
+                else:
+                    seen[name]["evolutions"] += 1
+
+    return sorted(seen.values(), key=lambda x: -x["evolutions"])[:40]
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -240,6 +304,8 @@ def list_tracked_variables(file_path: str) -> List[Dict[str, Any]]:
         return result
 
     # Always fall back to AST — works even with no recorded data
+    if file_path.endswith((".js", ".mjs", ".ts")):
+        return _extract_variables_js(file_path)
     return _extract_variables_ast(file_path)
 
 

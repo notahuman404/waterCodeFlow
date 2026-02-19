@@ -44,7 +44,7 @@ export class RunInspectorPanel {
                     }
                 }
             } else if (msg.command === 'openVariableInspector') {
-                vscode.commands.executeCommand('watercodeflow.openInspector');
+                vscode.commands.executeCommand('watercodeflow.openInspector', { varName: msg.varName });
             }
         });
     }
@@ -138,27 +138,50 @@ function enrichRecording(rec: any, extPath: string): any {
     const projectRoot = extPath;
     const watcherDir = path.join(projectRoot, 'built', 'watcher_events', runId);
     if (!fs.existsSync(watcherDir)) { return rec; }
-    const varMap: Record<string, any> = {};
+
+    // varMap stores an array of mutations per variable
+    const varMap: Record<string, any[]> = {};
+    const allMutations: any[] = []; // for global scrollbar
+
     try {
-        fs.readdirSync(watcherDir).filter(f => f.endsWith('.jsonl')).forEach(file => {
-            fs.readFileSync(path.join(watcherDir, file), 'utf8')
-                .split('\n').filter(Boolean)
-                .forEach(line => {
-                    try {
-                        const evt = JSON.parse(line);
-                        const name = evt.variable || evt.name;
-                        if (name) {
-                            varMap[name] = {
-                                name,
-                                value: evt.value ?? evt.new_value ?? null,
-                                scope: evt.scope || 'global',
-                                type:  evt.type || typeof evt.value,
-                                line_no: evt.line_no || evt.lineno || 0,
-                            };
-                        }
-                    } catch (_) {}
-                });
-        });
+        const files = fs.readdirSync(watcherDir).filter(f => f.endsWith('.jsonl'));
+        for (const file of files) {
+            const content = fs.readFileSync(path.join(watcherDir, file), 'utf8');
+            const lines = content.split('\n').filter(Boolean);
+            for (const line of lines) {
+                try {
+                    const evt = JSON.parse(line);
+                    const name = evt.variable || evt.name;
+                    if (name) {
+                        const mutation = {
+                            name,
+                            value: evt.value ?? evt.new_value ?? null,
+                            scope: evt.scope || 'global',
+                            type:  evt.type || typeof evt.value,
+                            line_no: evt.line_no || evt.lineno || 0,
+                            ts_ns: evt.ts_ns || 0,
+                            file: evt.file || ''
+                        };
+                        if (!varMap[name]) varMap[name] = [];
+                        varMap[name].push(mutation);
+                        allMutations.push(mutation);
+                    }
+                } catch (_) {}
+            }
+        }
     } catch (_) {}
-    return Object.keys(varMap).length > 0 ? { ...rec, vars: Object.values(varMap) } : rec;
+
+    // Sort mutations by timestamp
+    allMutations.sort((a, b) => a.ts_ns - b.ts_ns);
+    for (const name in varMap) {
+        varMap[name].sort((a, b) => a.ts_ns - b.ts_ns);
+    }
+
+    const varList = Object.keys(varMap).map(name => ({
+        name,
+        mutations: varMap[name],
+        last_mutation: varMap[name][varMap[name].length - 1]
+    }));
+
+    return varList.length > 0 ? { ...rec, vars: varList, all_mutations: allMutations } : rec;
 }

@@ -73,9 +73,11 @@ function render(){
       nm.className = 'var-name'; nm.textContent = v.name;
       const mt = document.createElement('span');
       mt.className = 'var-meta';
-      // Show just the filename (not full path) for brevity
-      const fname = (v.file || '').split('/').pop() || v.file || '';
-      mt.textContent = (fname ? fname + ' — ' : '') + v.scope;
+
+      // Scope badge
+      const sc = document.createElement('span');
+      sc.className = 'scope-badge ' + v.scope;
+      sc.textContent = v.scope;
 
       const acts = document.createElement('div'); acts.className = 'var-actions';
 
@@ -89,18 +91,18 @@ function render(){
         render();
       });
 
-      // Track checkbox
+      // Track checkbox (the "box after each variables name")
       const cb = document.createElement('div');
       cb.className = 'check-box' + (st.tracked ? ' checked' : '');
       cb.innerHTML = st.tracked ? '&#10003;' : '';
-      cb.title = st.tracked ? 'Tracked — click to untrack' : 'Click to track';
+      cb.title = st.tracked ? 'Tracking enabled' : 'Click to track';
       cb.addEventListener('click', e => {
         e.stopPropagation();
         vscode.postMessage({ command: 'toggleTrack', name: v.name, filePath: currentFilePath });
       });
 
       acts.appendChild(eye); acts.appendChild(cb);
-      row.appendChild(nm); row.appendChild(mt); row.appendChild(acts);
+      row.appendChild(nm); row.appendChild(sc); row.appendChild(mt); row.appendChild(acts);
       body.appendChild(row);
 
       // Tracking options dropdown
@@ -119,14 +121,14 @@ function render(){
             inp.addEventListener('input', () => {
               const runs = parseInt(inp.value) || 1;
               trackState[v.name] = { ...getState(v.name), runs };
-              vscode.postMessage({ command: 'setTrackMode', name: v.name, mode: 'multi', runs });
+              vscode.postMessage({ command: 'setTrackMode', name: v.name, mode: 'multi', runs, filePath: currentFilePath });
             });
             inp.addEventListener('click', e => e.stopPropagation());
             r.appendChild(inp);
           }
           r.addEventListener('click', () => {
             trackState[v.name] = { ...getState(v.name), mode };
-            vscode.postMessage({ command: 'setTrackMode', name: v.name, mode });
+            vscode.postMessage({ command: 'setTrackMode', name: v.name, mode, filePath: currentFilePath });
             render();
           });
           return r;

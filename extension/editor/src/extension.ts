@@ -42,15 +42,30 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.registerWebviewViewProvider('watercodeflow.recordingViewer', recordingViewerProvider)
     );
 
+    const recordingsProvider = new RecordingsPanel(context.extensionUri, bridge, context);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider('watercodeflow.recordings', recordingsProvider)
+    );
+
+    const settingsProvider = new SettingsPanel(context.extensionUri, bridge);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider('watercodeflow.settings', settingsProvider)
+    );
+
+    const fileSelectorProvider = new FileSelectorPanel(context.extensionUri, bridge, context);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider('watercodeflow.fileSelector', fileSelectorProvider)
+    );
+
     context.subscriptions.push(
         vscode.commands.registerCommand('watercodeflow.openSettings', () =>
-            SettingsPanel.createOrShow(context.extensionUri, bridge)),
+            vscode.commands.executeCommand('watercodeflow.settings.focus')),
 
         vscode.commands.registerCommand('watercodeflow.openFileSelector', () =>
-            FileSelectorPanel.createOrShow(context.extensionUri, bridge, context)),
+            vscode.commands.executeCommand('watercodeflow.fileSelector.focus')),
 
         vscode.commands.registerCommand('watercodeflow.openRecordings', () =>
-            RecordingsPanel.createOrShow(context.extensionUri, bridge)),
+            vscode.commands.executeCommand('watercodeflow.recordings.focus')),
 
         vscode.commands.registerCommand('watercodeflow.openInsights', () =>
             InsightsPanel.createOrShow(context.extensionUri, bridge)),

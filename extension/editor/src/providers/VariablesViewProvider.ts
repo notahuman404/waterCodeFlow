@@ -36,26 +36,29 @@ export class VariablesViewProvider implements vscode.WebviewViewProvider {
                     break;
 
                 case 'toggleTrack': {
-                    // IMPORTANT: Variable tracking is UI-ONLY.
-                    // Variables come from RUN RECORDINGS (watcher mutations), not daemon.
-                    // This toggle just marks which variables the user wants to see.
-                    const { name } = msg;
+                    const { name, filePath } = msg;
                     const s = this._trackState[name] || { tracked: false, mode: 'multi', runs: 5 };
                     s.tracked = !s.tracked;
                     this._trackState[name] = s;
+
                     // Persist trackState for next session
                     await this._context.globalState.update(TRACK_STATE_KEY, this._trackState);
+
+                    // Update global filesScope setting to sync with watcher
+                    await this._updateFilesScope(filePath);
+
                     webviewView.webview.postMessage({ command: 'trackState', name, state: s });
                     break;
                 }
 
                 case 'setTrackMode': {
-                    const { name, mode, runs } = msg;
+                    const { name, mode, runs, filePath } = msg;
                     const s = this._trackState[name] || { tracked: true, mode: 'multi', runs: 5 };
                     s.mode = mode;
                     if (runs !== undefined) { s.runs = runs; }
                     this._trackState[name] = s;
                     await this._context.globalState.update(TRACK_STATE_KEY, this._trackState);
+                    if (filePath) { await this._updateFilesScope(filePath); }
                     break;
                 }
 
@@ -74,6 +77,45 @@ export class VariablesViewProvider implements vscode.WebviewViewProvider {
         webviewView.onDidChangeVisibility(() => {
             if (webviewView.visible) { this._pushVars(); }
         });
+    }
+
+    private async _updateFilesScope(filePath: string) {
+        if (!filePath) return;
+        const cfg = vscode.workspace.getConfiguration('watercodeflow');
+        const currentScope = cfg.get<string>('filesScope', '');
+
+        // Parse current scope: file1:(scope:var),file2:(...)
+        const scopeMap: Record<string, string[]> = {};
+        if (currentScope) {
+            const parts = currentScope.split('),');
+            for (let part of parts) {
+                if (!part.includes(':(')) continue;
+                const [file, vars] = part.split(':(');
+                scopeMap[file] = vars.replace(')', '').split(',').filter(Boolean);
+            }
+        }
+
+        // Update for current file
+        const trackedVars = Object.entries(this._trackState)
+            .filter(([, s]) => s.tracked)
+            .map(([name]) => {
+                // We need the scope too. We'll have to find it from the last pushed vars or AST
+                // For now, let's assume 'both' if unknown, but better to use real scope
+                return `both:${name}`;
+            });
+
+        if (trackedVars.length > 0) {
+            scopeMap[vscode.workspace.asRelativePath(filePath)] = trackedVars;
+        } else {
+            delete scopeMap[vscode.workspace.asRelativePath(filePath)];
+        }
+
+        // Rebuild string
+        const newScope = Object.entries(scopeMap)
+            .map(([file, vars]) => `${file}:(${vars.join(',')})`)
+            .join(',');
+
+        await cfg.update('filesScope', newScope, vscode.ConfigurationTarget.Global);
     }
 
     private async _pushVars() {

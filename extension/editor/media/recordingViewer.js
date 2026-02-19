@@ -30,7 +30,7 @@ function renderDots(){
   changeCount.textContent = (total === 0 ? 'no' : total) + ' tick' + (total !== 1 ? 's' : '');
   for(let i=0;i<total;i++){
     const d=document.createElement('div');
-    d.className='dot'+(i===activeDot?' active':'');
+    d.className='dot cyan'+(i===activeDot?' active':'');
     d.title = recordings[i] ? 'Tick #'+(recordings[i].tick_id || (i+1)) : '—';
     d.addEventListener('click',()=>{
       activeDot=i;

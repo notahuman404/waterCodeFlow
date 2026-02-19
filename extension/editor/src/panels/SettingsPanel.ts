@@ -2,55 +2,30 @@ import * as vscode from 'vscode';
 import { GlueBridge } from '../GlueBridge';
 import { getNonce } from '../utils';
 
-export class SettingsPanel {
+export class SettingsPanel implements vscode.WebviewViewProvider {
     public static currentPanel: SettingsPanel | undefined;
-    private readonly _panel: vscode.WebviewPanel;
+    private _view?: vscode.WebviewView;
     private _disposables: vscode.Disposable[] = [];
 
-    public static createOrShow(extensionUri: vscode.Uri, bridge: GlueBridge) {
-        const column = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
-        if (SettingsPanel.currentPanel) {
-            SettingsPanel.currentPanel._panel.reveal(column);
-            return;
-        }
-        const panel = vscode.window.createWebviewPanel(
-            'watercodeflow.settings', 'Watcher Settings', column,
-            { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')] }
-        );
-        SettingsPanel.currentPanel = new SettingsPanel(panel, extensionUri, bridge);
+    constructor(private readonly _extensionUri: vscode.Uri, private bridge: GlueBridge) {
+        SettingsPanel.currentPanel = this;
     }
 
-    private _pushSettings() {
-        const cfg = vscode.workspace.getConfiguration('watercodeflow');
-        this._panel.webview.postMessage({
-            command: 'loadSettings',
-            settings: {
-                trackThreads:      cfg.get('trackThreads', true),
-                trackLocals:       cfg.get('trackLocals', false),
-                trackSql:          cfg.get('trackSql', true),
-                trackAll:          cfg.get('trackAll', true),
-                samplingInterval:  cfg.get('samplingInterval', 0.5),
-                daemonThreads:     cfg.get('daemonThreads', 4),
-                aiModel:           cfg.get('aiModel', 'Gemini'),
-                logLevel:          cfg.get('logLevel', 'INFO'),
-                mutationDepth:     cfg.get('mutationDepth', 'Custom & Full'),
-                filesScope:        cfg.get('filesScope', ''),
-                maxQueueSize:      cfg.get('maxQueueSize', 1000),
-                customProcessor:   cfg.get('customProcessor', ''),
-            }
-        });
-    }
+    public resolveWebviewView(
+        webviewView: vscode.WebviewView,
+        _context: vscode.WebviewViewResolveContext,
+        _token: vscode.CancellationToken
+    ) {
+        this._view = webviewView;
+        webviewView.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, 'media')]
+        };
+        webviewView.webview.html = this._getHtml(webviewView.webview, this._extensionUri);
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, private bridge: GlueBridge) {
-        this._panel = panel;
-        this._panel.webview.html = this._getHtml(panel.webview, extensionUri);
-        this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-
-        this._panel.webview.onDidReceiveMessage(async (msg) => {
+        webviewView.webview.onDidReceiveMessage(async (msg) => {
             if (msg.command === 'ready') {
-                // Webview is fully loaded — safe to push stored settings now
                 this._pushSettings();
-
             } else if (msg.command === 'saveSettings') {
                 const cfg = vscode.workspace.getConfiguration('watercodeflow');
                 await cfg.update('trackThreads',    msg.trackThreads,    vscode.ConfigurationTarget.Global);
@@ -66,9 +41,7 @@ export class SettingsPanel {
                 await cfg.update('maxQueueSize',    msg.maxQueueSize,    vscode.ConfigurationTarget.Global);
                 await cfg.update('customProcessor', msg.customProcessor, vscode.ConfigurationTarget.Global);
                 vscode.window.showInformationMessage('WaterCodeFlow: Settings saved.');
-                // Confirm saved values back to webview
                 this._pushSettings();
-
             } else if (msg.command === 'browseProcessor') {
                 const uris = await vscode.window.showOpenDialog({
                     canSelectFiles: true, canSelectFolders: false, canSelectMany: false,
@@ -76,14 +49,13 @@ export class SettingsPanel {
                     filters: { 'Python / Scripts': ['py', 'sh', 'js'] }
                 });
                 if (uris && uris.length > 0) {
-                    this._panel.webview.postMessage({ command: 'setProcessor', path: uris[0].fsPath });
+                    this._view?.webview.postMessage({ command: 'setProcessor', path: uris[0].fsPath });
                 }
-
             } else if (msg.command === 'resetRecording') {
                 const fp = vscode.window.activeTextEditor?.document.fileName || '';
                 if (fp) {
                     try {
-                        await bridge.send('deleteAllRecordings', { filePath: fp });
+                        await this.bridge.send('deleteAllRecordings', { filePath: fp });
                         vscode.window.showInformationMessage('WaterCodeFlow: All recordings for this file have been reset.');
                     } catch (e: any) {
                         vscode.window.showErrorMessage('Reset failed: ' + e.message);
@@ -95,9 +67,33 @@ export class SettingsPanel {
         });
     }
 
+    private _pushSettings() {
+        if (!this._view) return;
+        const cfg = vscode.workspace.getConfiguration('watercodeflow');
+        const trackLocalsInfo = cfg.inspect('trackLocals');
+        const trackLocals = trackLocalsInfo?.globalValue ?? trackLocalsInfo?.defaultValue ?? false;
+
+        this._view.webview.postMessage({
+            command: 'loadSettings',
+            settings: {
+                trackThreads:      cfg.get('trackThreads', true),
+                trackLocals:       trackLocals,
+                trackSql:          cfg.get('trackSql', true),
+                trackAll:          cfg.get('trackAll', true),
+                samplingInterval:  cfg.get('samplingInterval', 0.5),
+                daemonThreads:     cfg.get('daemonThreads', 4),
+                aiModel:           cfg.get('aiModel', 'Gemini'),
+                logLevel:          cfg.get('logLevel', 'INFO'),
+                mutationDepth:     cfg.get('mutationDepth', 'Custom & Full'),
+                filesScope:        cfg.get('filesScope', ''),
+                maxQueueSize:      cfg.get('maxQueueSize', 1000),
+                customProcessor:   cfg.get('customProcessor', ''),
+            }
+        });
+    }
+
     public dispose() {
         SettingsPanel.currentPanel = undefined;
-        this._panel.dispose();
         while (this._disposables.length) { this._disposables.pop()?.dispose(); }
     }
 

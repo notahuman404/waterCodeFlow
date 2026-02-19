@@ -43,18 +43,21 @@ body {
   gap: 4px;
 }
 .dot {
-  width: 14px; height: 14px;
+  width: 12px; height: 12px;
   border-radius: 50%;
   background: #555;
   cursor: pointer;
   transition: background 0.15s, transform 0.15s;
   flex-shrink: 0;
+  border: 2px solid transparent;
 }
-.dot:hover { background: #777; transform: scale(1.15); }
+.dot:hover { background: #00ffff; transform: scale(1.15); }
+.dot.cyan { background: #00ffff; }
 .dot.active {
   background: #999;
-  transform: scale(1.2);
-  box-shadow: 0 0 0 2px rgba(255,255,255,0.2);
+  transform: scale(1.3);
+  box-shadow: 0 0 0 2px #00ffff;
+  border-color: #fff;
 }
 .scrubber-labels {
   display: flex;
